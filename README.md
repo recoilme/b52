@@ -41,7 +41,7 @@ When b52 prepared properly, the ingredients separate into three distinctly visib
 
 ### The balance between speed and efficiency is achieved as follows:
 
-New entries go to disk (sniper). As you access them, they are cached in the cache (ristretto). Life-limited records are stored separately (freecache).
+New entries go to disk (sniper). As you access them, they are cached in the LRU-cache (ristretto). Life-limited records are stored separately, in freecache (without persistance storage).
 
 ## Usage (telnet example)
 

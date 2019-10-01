@@ -1,4 +1,13 @@
-# `b52`
+
+
+<p align="center">
+<img 
+    src="https://upload.wikimedia.org/wikipedia/commons/3/3a/Cocktail_B52.jpg" 
+    width="128" height="200" border="0" alt="b-52">
+    <br>
+    b52
+</p>
+
 
 [![GoDoc](https://img.shields.io/badge/api-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/recoilme/b52)
 

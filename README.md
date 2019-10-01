@@ -29,14 +29,19 @@ This will retrieve and build the server.
 
 ## How it work
 
-`b52` contains from 3 layers.
+`b52` is a layered database composed of a sniper, ristretto and freecache. 
+When b52 prepared properly, the ingredients separate into three distinctly visible layers.
 
-[sniper](https://github.com/recoilme/sniper) - fast, persistant on disk storage
+[sniper](https://github.com/recoilme/sniper) - [fast](https://github.com/recoilme/sniper#performance), persistant on disk storage
 
-[ristretto](https://github.com/dgraph-io/ristretto) - effective, inmemory LRU cache for "hot" values
+[ristretto](https://github.com/dgraph-io/ristretto) - [effective](https://github.com/dgraph-io/ristretto#features), inmemory LRU cache for "hot" values
 
-[freecache](https://github.com/coocood/freecache) - in memory cache, for keys with TTL (time to live)
+[freecache](https://github.com/coocood/freecache) - in memory, [with zero GC overhead](https://github.com/coocood/freecache#features) cache, for keys with TTL (time to live)
 
+
+### The balance between speed and efficiency is achieved as follows:
+
+New entries go to disk (sniper). As you access them, they are cached in the cache (ristretto). Life-limited records are stored separately (freecache).
 
 ## Usage (telnet example)
 

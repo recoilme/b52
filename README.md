@@ -43,6 +43,16 @@ When b52 prepared properly, the ingredients separate into three distinctly visib
 
 New entries go to disk (sniper). As you access them, they are cached in the LRU-cache (ristretto). Life-limited records are stored separately, in freecache (without persistance storage).
 
+## Memory usage
+
+For minimizing GC and allocations overhead - Sniper stored keys, and value addres/size in plain hash (map[uint64]uint64). HashMaps are fast, but has a memory cost. You must have 4Gb+ memory for storing every 100_000_000 entrys.
+
+In Freecache and Ristretto memory is preallocated and it's size depends from you. 
+
+## Disk usage
+
+Sniper has a minimum 8 byte overhead on every entry. But it allocate space in power of 2, and try to reuse space, if value grow. And sniper will try to reuse space from deleted/evicted records.
+
 ## Usage (telnet example)
 
 ```

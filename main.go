@@ -13,27 +13,27 @@ import (
 )
 
 var (
-	listenaddr = flag.String("l", "", "Interface to listen on. Default to all addresses.")
-	network    = flag.String("n", "tcp", "Network to listen on (tcp,tcp4,tcp6,unix). unix not tested! Default is tcp")
-	port       = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
-	params     = flag.String("params", "", "params for engine, url query format:a=b&c=d")
+	//network    = flag.String("n", "tcp", "Network to listen on (tcp,tcp4,tcp6,unix). unix not tested! Default is tcp")
+	laddr  = flag.String("l", "", "Interface to listen on. Default to all addresses.")
+	port   = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
+	params = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: sizelru=100&sizettl=100")
 )
 
 func main() {
 	flag.Parse()
 
-	var b52 mcproto.McEngine
-	b52, err := newb52()
-	if err != nil {
-		log.Fatalf("failed to create database: %s", err.Error())
-	}
-
-	address := fmt.Sprintf("%s:%d", *listenaddr, *port)
-
-	listener, err := net.Listen(*network, address)
+	address := fmt.Sprintf("%s:%d", *laddr, *port)
+	network := "tcp"
+	listener, err := net.Listen(network, address)
 	if err != nil {
 		log.Fatalf("failed to serve: %s", err.Error())
 		return
+	}
+
+	var b52 mcproto.McEngine
+	b52, err = newb52(*params, address, "")
+	if err != nil {
+		log.Fatalf("failed to create database: %s", err.Error())
 	}
 
 	// Wait for interrupt signal to gracefully shutdown the server with
@@ -48,13 +48,15 @@ func main() {
 		if q == syscall.SIGPIPE || q.String() == "broken pipe" {
 			return
 		}
-		//return
-		//b52.Close()
-		os.Exit(1)
+		err = b52.Close()
+		if err != nil {
+			fmt.Println("Close", err)
+		}
+		os.Exit(0)
 	}()
 	// start service
 	defer listener.Close()
-	fmt.Printf("\nServer is listening on %s %s \n", *network, address)
+	fmt.Printf("\nServer is listening on %s %s \n", network, address)
 
 	for {
 

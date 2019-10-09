@@ -159,7 +159,7 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 		mc.MaxIdleConns = 1
 		errSlave := mc.Set(&memcache.Item{Key: string(key), Value: value, Flags: 1, Expiration: exp})
 		if errSlave != nil {
-			println(err.Error())
+			println(errSlave.Error())
 		}
 	}
 

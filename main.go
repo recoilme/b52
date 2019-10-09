@@ -14,9 +14,10 @@ import (
 
 var (
 	//network    = flag.String("n", "tcp", "Network to listen on (tcp,tcp4,tcp6,unix). unix not tested! Default is tcp")
-	laddr  = flag.String("l", "", "Interface to listen on. Default to all addresses.")
-	port   = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
-	params = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: sizelru=100&sizettl=100")
+	laddr    = flag.String("l", "", "Interface to listen on. Default to all addresses.")
+	port     = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
+	slaveadr = flag.String("slave", "", "Slave address, optional, example slave=127.0.0.1:11212")
+	params   = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: sizelru=100&sizettl=100&dbdir=db")
 )
 
 func main() {
@@ -31,7 +32,7 @@ func main() {
 	}
 
 	var b52 mcproto.McEngine
-	b52, err = newb52(*params, address, "")
+	b52, err = newb52(*params, *slaveadr)
 	if err != nil {
 		log.Fatalf("failed to create database: %s", err.Error())
 	}
@@ -52,7 +53,7 @@ func main() {
 		if err != nil {
 			fmt.Println("Close", err)
 		}
-		os.Exit(0)
+		os.Exit(1)
 	}()
 	// start service
 	defer listener.Close()

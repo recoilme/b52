@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"runtime/debug"
 	"strconv"
+	"sync"
 
 	"github.com/dgraph-io/ristretto"
 
@@ -107,7 +108,34 @@ func (db *b52) Get(key []byte, rw *bufio.ReadWriter) (value []byte, noreply bool
 }
 
 func (db *b52) Gets(keys [][]byte, rw *bufio.ReadWriter) (err error) {
-	return
+	var wg sync.WaitGroup
+	read := func(key []byte) {
+		defer wg.Done()
+		//var value []byte
+		if val, ok := db.lru.Get(key); ok {
+			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(val.([]byte)), val.([]byte))
+			return //val.([]byte), false, nil
+		}
+		if value, err := db.ttl.Get(key); err == nil {
+			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+			return
+		}
+		value, err := db.ssd.Get(key)
+		if err == nil {
+			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+		}
+	}
+	wg.Add(len(keys))
+	for _, key := range keys {
+		go read(key)
+	}
+	wg.Wait()
+	_, err = rw.Write([]byte("END\r\n"))
+	if err == nil {
+		err = rw.Flush()
+	}
+	return err
+
 }
 
 // Set store k/v with expire time in memory cache

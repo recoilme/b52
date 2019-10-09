@@ -108,6 +108,7 @@ func (db *b52) Get(key []byte, rw *bufio.ReadWriter) (value []byte, noreply bool
 }
 
 func (db *b52) Gets(keys [][]byte, rw *bufio.ReadWriter) (err error) {
+
 	var wg sync.WaitGroup
 	read := func(key []byte) {
 		defer wg.Done()
@@ -116,12 +117,12 @@ func (db *b52) Gets(keys [][]byte, rw *bufio.ReadWriter) (err error) {
 			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(val.([]byte)), val.([]byte))
 			return //val.([]byte), false, nil
 		}
-		if value, err := db.ttl.Get(key); err == nil {
+		if value, errttl := db.ttl.Get(key); errttl == nil {
 			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
 			return
 		}
-		value, err := db.ssd.Get(key)
-		if err == nil {
+		value, errssd := db.ssd.Get(key)
+		if errssd == nil {
 			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
 		}
 	}

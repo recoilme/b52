@@ -32,7 +32,7 @@ func main() {
 	}
 
 	var b52 mcproto.McEngine
-	b52, err = newb52(*params, *slaveadr)
+	b52, err = Newb52(*params, *slaveadr)
 	if err != nil {
 		log.Fatalf("failed to create database: %s", err.Error())
 	}
@@ -58,16 +58,26 @@ func main() {
 	// start service
 	defer listener.Close()
 	fmt.Printf("\nServer is listening on %s %s \n", network, address)
+	serve(listener, b52, "buf=4096&deadline=6000")
+}
 
-	for {
+func serve(listener net.Listener, b52 mcproto.McEngine, mcparams string) {
+	go func() {
+		for {
 
-		conn, err := listener.Accept()
+			conn, err := listener.Accept()
 
-		if err != nil {
-			fmt.Println("conn", err)
-			conn.Close()
-			continue
+			if err != nil {
+				//fmt.Println("conn", err)
+				if conn != nil {
+					conn.Close()
+				}
+				continue
+			} else {
+				//println("Accept")
+				go mcproto.ParseMc(conn, b52, mcparams)
+			}
+
 		}
-		go mcproto.ParseMc(conn, b52, "")
-	}
+	}()
 }

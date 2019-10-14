@@ -7,11 +7,10 @@ import (
 	"net/url"
 	"runtime/debug"
 	"strconv"
-	"sync"
+	"time"
 
 	"github.com/dgraph-io/ristretto"
 
-	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/coocood/freecache"
 	"github.com/recoilme/mcproto"
 	"github.com/recoilme/sniper"
@@ -24,8 +23,8 @@ type b52 struct {
 	slave string
 }
 
-// newb52 - init filter
-func newb52(params, slaveadr string) (mcproto.McEngine, error) {
+// Newb52 - init database with params
+func Newb52(params, slaveadr string) (mcproto.McEngine, error) {
 	p, err := url.ParseQuery(params)
 	if err != nil {
 		log.Fatal(err)
@@ -34,13 +33,13 @@ func newb52(params, slaveadr string) (mcproto.McEngine, error) {
 	sizelru := "100"
 	if len(p["sizelru"]) > 0 {
 		sizelru = p["sizelru"][0]
-	} else {
-		fmt.Println("sizelru not set, fallback to default")
 	}
+
 	lrusize, err := strconv.Atoi(sizelru)
 	if err != nil {
-		fmt.Println("sizelru parse error, fallback to default", err.Error())
-		log.Fatal(err)
+		println("sizelru parse error, fallback to default, 100Mb", err.Error())
+	} else {
+		println("sizelru:", lrusize, "Mb")
 	}
 	lrusize = lrusize * 1024 * 1024 //Mb
 
@@ -48,18 +47,20 @@ func newb52(params, slaveadr string) (mcproto.McEngine, error) {
 	if len(p["sizettl"]) > 0 {
 		sizettl = p["sizettl"][0]
 	} else {
-		fmt.Println("sizettl not set, fallback to default")
+		println("sizettl not set, fallback to default, 100Mb")
 	}
 	ttlsize, err := strconv.Atoi(sizettl)
 	if err != nil {
-		fmt.Println("sizettl parse error, fallback to default", err.Error())
-		log.Fatal(err)
+		fmt.Println("sizettl parse error, fallback to default, 100Mb", err.Error())
+	} else {
+		println("sizettl:", ttlsize, "Mb")
 	}
 	ttlsize = ttlsize * 1024 * 1024
 
 	dbdir := "db"
 	if len(p["dbdir"]) > 0 {
 		dbdir = p["dbdir"][0]
+		println("dbdir:", dbdir)
 	}
 
 	slave := ""
@@ -88,7 +89,9 @@ func newb52(params, slaveadr string) (mcproto.McEngine, error) {
 	debug.SetGCPercent(20)
 
 	db.slave = slave
-	println("set slave at:", db.slave)
+	if slave != "" {
+		println("set slave at:", db.slave)
+	}
 
 	return db, nil
 }
@@ -107,41 +110,94 @@ func (db *b52) Get(key []byte, rw *bufio.ReadWriter) (value []byte, noreply bool
 	return
 }
 
-func (db *b52) Gets(keys [][]byte, rw *bufio.ReadWriter) (err error) {
+func (db *b52) Gets(keys [][]byte, rw *bufio.ReadWriter) (kv [][]byte, err error) {
+	//t2 := time.Now()
+	/*
+		var wg sync.WaitGroup
 
-	var wg sync.WaitGroup
-	read := func(key []byte) {
-		defer wg.Done()
-		//var value []byte
+		//response := make(chan [][]byte)
+		read := func(key []byte) {
+			defer wg.Done()
+
+			//res := make([][]byte, 0)
+			if val, ok := db.lru.Get(key); ok {
+				//res = append(res, key)
+				//res = append(res, val.([]byte))
+				//response <- res
+				//	fmt.Fprintf(b, "VALUE %s 0 %d\r\n%s\r\n", key, len(val.([]byte)), val.([]byte))
+				//bufPool.Put(b)
+				_ = val
+				return //val.([]byte), false, nil
+			}
+			if value, errttl := db.ttl.Get(key); errttl == nil {
+				//res = append(res, key)
+				//res = append(res, value)
+				//response <- res
+				//fmt.Fprintf(b, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+				//bufPool.Put(b)
+				_ = value
+				return
+			}
+			value, errssd := db.ssd.Get(key)
+			if errssd == nil {
+				_ = value
+				//res = append(res, key)
+				//	res = append(res, value)
+				//response <- res
+				//fmt.Fprintf(b, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+				//bufPool.Put(b)
+			}
+		}
+		wg.Add(len(keys))
+	*/
+	for _, key := range keys {
 		if val, ok := db.lru.Get(key); ok {
 			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(val.([]byte)), val.([]byte))
-			return //val.([]byte), false, nil
+			continue
 		}
 		if value, errttl := db.ttl.Get(key); errttl == nil {
 			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
-			return
+			continue
 		}
-		value, errssd := db.ssd.Get(key)
-		if errssd == nil {
+		if value, errssd := db.ssd.Get(key); errssd == nil {
 			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
 		}
 	}
-	wg.Add(len(keys))
-	for _, key := range keys {
-		go read(key)
-	}
-	wg.Wait()
+
+	//wg.Wait()
 	_, err = rw.Write([]byte("END\r\n"))
-	if err == nil {
-		err = rw.Flush()
+	if err != nil {
+		fmt.Println("rw.Write", err.Error())
 	}
-	return err
+	err = rw.Flush()
+	if err != nil {
+		fmt.Println("rw.Flush", err.Error())
+	}
+	//close(response)
+	//}()
+	/*done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for resp := range response {
+			kv = append(kv, resp...)
+		}
+	}()
+
+	<-done*/
+
+	//t3 := time.Now()
+	//if t3.Sub(t2) > (1 * time.Millisecond) {
+	//	println("get is slow!:", t3.Sub(t2).Milliseconds())
+	//}
+	return kv, nil
 
 }
 
 // Set store k/v with expire time in memory cache
 // Persistent k/v - stored on disk
 func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply bool, rw *bufio.ReadWriter) (noreplyresp bool, err error) {
+	t1 := time.Now()
+
 	if exp > 0 {
 		err = db.ttl.Set(key, value, int(exp))
 		return
@@ -154,14 +210,15 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 		// if in LRU cache - update
 		db.lru.Set(key, value, 0)
 	}
-
+	t2 := time.Now()
 	if db.slave != "" && flags != 1 {
-		mc := memcache.New(db.slave)
-		mc.MaxIdleConns = 1
-		errSlave := mc.Set(&memcache.Item{Key: string(key), Value: value, Flags: 1, Expiration: exp})
-		if errSlave != nil {
-			println(errSlave.Error())
-		}
+		//mc := memcache.New(db.slave)
+		//mc.MaxIdleConns = 1
+		//go mc.Set(&memcache.Item{Key: string(key), Value: value, Flags: 1, Expiration: exp})
+	}
+	t3 := time.Now()
+	if t3.Sub(t1) > (20 * time.Millisecond) {
+		println("set", t3.Sub(t1), t2.Sub(t1))
 	}
 
 	return
@@ -170,9 +227,11 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 func (db *b52) Incr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint64, isFound bool, noreply bool, err error) {
 	return
 }
+
 func (db *b52) Decr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint64, isFound bool, noreply bool, err error) {
 	return
 }
+
 func (db *b52) Delete(key []byte, rw *bufio.ReadWriter) (isFound bool, noreply bool, err error) {
 	return
 }

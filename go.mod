@@ -7,7 +7,7 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/coocood/freecache v1.1.0
 	github.com/dgraph-io/ristretto v0.0.0-20191001142246-d963fa241740
-	github.com/recoilme/mcproto v0.1.5
+	github.com/recoilme/mcproto v0.1.8
 
 	github.com/recoilme/sniper v0.1.1
 

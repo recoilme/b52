@@ -19,6 +19,12 @@ github.com/recoilme/mcproto v0.1.4 h1:rrMZClwF8Vy+vKz52oLtIDQ9BPgQW0bSRqepZergVO
 github.com/recoilme/mcproto v0.1.4/go.mod h1:JDNS0Kl0TKRPldM40qlyJmJ8R2lg07j+3wL9HCnvkiM=
 github.com/recoilme/mcproto v0.1.5 h1:noUjLpSxicVzG+u8kiF8cA6kRBxhRBt7ixasvhIQO6c=
 github.com/recoilme/mcproto v0.1.5/go.mod h1:JDNS0Kl0TKRPldM40qlyJmJ8R2lg07j+3wL9HCnvkiM=
+github.com/recoilme/mcproto v0.1.6 h1:IPUZsqQlRZFJZqVjyYNBTco2Q9vrZCzvY8cQdD2eQEc=
+github.com/recoilme/mcproto v0.1.6/go.mod h1:JDNS0Kl0TKRPldM40qlyJmJ8R2lg07j+3wL9HCnvkiM=
+github.com/recoilme/mcproto v0.1.7 h1:ARsiVHUBPVHg+EoTDOnS7/JBUzIStIfopd0RmmScJRs=
+github.com/recoilme/mcproto v0.1.7/go.mod h1:JDNS0Kl0TKRPldM40qlyJmJ8R2lg07j+3wL9HCnvkiM=
+github.com/recoilme/mcproto v0.1.8 h1:cfwOoW+LfThki+0DI9wieWqfbGscdFCQl9XaWrWfJxo=
+github.com/recoilme/mcproto v0.1.8/go.mod h1:JDNS0Kl0TKRPldM40qlyJmJ8R2lg07j+3wL9HCnvkiM=
 github.com/recoilme/sniper v0.1.1 h1:wfbLandgrTMWZNqZ+xDUiK4DDcuIAR5Pm5w/sLnAM9I=
 github.com/recoilme/sniper v0.1.1/go.mod h1:8Q9MpI//VA5hQygl7oyRqym6B5vz/qZNGfF2a5BKNYI=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=

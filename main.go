@@ -51,14 +51,15 @@ func main() {
 		}
 		err = b52.Close()
 		if err != nil {
-			fmt.Println("Close", err)
+			fmt.Println("Close", err.Error())
 		}
 		os.Exit(1)
 	}()
 	// start service
 	defer listener.Close()
 	fmt.Printf("\nServer is listening on %s %s \n", network, address)
-	serve(listener, b52, "buf=4096&deadline=6000")
+	serve(listener, b52, "buf=81920&deadline=1200000")
+	select {}
 }
 
 func serve(listener net.Listener, b52 mcproto.McEngine, mcparams string) {

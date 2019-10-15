@@ -27,6 +27,17 @@ $ go build
 
 This will retrieve and build the server.
 
+## Starting
+
+Use `./b52 --help` for full list of params.
+
+```sh
+./b52 -p 11212 -params "sizelru=10&sizettl=10&dbdir="
+#Start server on port 11212 with 10Mb lru and ttl size, without persistent database.
+```
+
+or just ./b52 - for start with default params
+
 ## How it work
 
 `b52` is a layered database composed of a sniper, ristretto and freecache. 

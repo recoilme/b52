@@ -13,11 +13,15 @@ import (
 )
 
 var (
-	//network    = flag.String("n", "tcp", "Network to listen on (tcp,tcp4,tcp6,unix). unix not tested! Default is tcp")
-	laddr    = flag.String("l", "", "Interface to listen on. Default to all addresses.")
-	port     = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
-	slaveadr = flag.String("slave", "", "Slave address, optional, example slave=127.0.0.1:11212")
-	params   = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: sizelru=100&sizettl=100&dbdir=db")
+	version   = "0.1.0"
+	port      = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
+	slaveadr  = flag.String("slave", "", "Slave address, optional, example slave=127.0.0.1:11212")
+	unixs     = flag.String("unixs", "", "unix socket")
+	stdlib    = flag.Bool("stdlib", false, "use stdlib")
+	loops     = flag.Int("loops", 0, "num loops")
+	balance   = flag.String("balance", "random", "balance - random, round-robin or least-connections")
+	keepalive = flag.Int("keepalive", 0, "keepalive connection, in seconds")
+	params    = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: sizelru=100&sizettl=100&dbdir=db")
 )
 
 type conn struct {
@@ -27,20 +31,11 @@ type conn struct {
 
 func main() {
 	flag.Parse()
-	//port := 11211
-
-	//address := fmt.Sprintf("%s:%d", *laddr, *port)
-	//network := "tcp"
-	//listener, err := net.Listen(network, address)
-	//if err != nil {
-	//	log.Fatalf("failed to serve: %s", err.Error())
-	//	return
-	//}
 
 	var b52 McEngine
 	b52, err := Newb52(*params, *slaveadr)
 	if err != nil {
-		log.Fatalf("failed to create database: %s", err.Error())
+		log.Fatalf("failed to create Newb52 database: %s", err.Error())
 	}
 
 	// Wait for interrupt signal to gracefully shutdown the server with
@@ -52,6 +47,7 @@ func main() {
 	go func() {
 		q := <-quit
 		fmt.Printf("\nRECEIVED SIGNAL: %s\n", q)
+		//ignore broken pipe
 		if q == syscall.SIGPIPE || q.String() == "broken pipe" {
 			return
 		}
@@ -61,14 +57,9 @@ func main() {
 		}
 		os.Exit(1)
 	}()
-	// start service
-	//defer listener.Close()
-	//fmt.Printf("\nServer is listening on %s %s \n", network, address)
-	//serve(listener, b52, "buf=81920&deadline=1200000")
-	//select {}
+
 	var events evio.Events
-	balance := "random"
-	switch balance {
+	switch *balance {
 	default:
 		log.Fatalf("invalid -balance flag: '%v'", balance)
 	case "random":
@@ -78,16 +69,17 @@ func main() {
 	case "least-connections":
 		events.LoadBalance = evio.LeastConnections
 	}
-	loops := -1
-	events.NumLoops = loops
-	events.Serving = func(srv evio.Server) (action evio.Action) {
-		fmt.Printf("server started on port %d (loops: %d)\n", *port, srv.NumLoops)
 
+	events.NumLoops = *loops
+	events.Serving = func(srv evio.Server) (action evio.Action) {
+		fmt.Printf("b52 server started on port %d (loops: %d)\n", *port, srv.NumLoops)
 		return
 	}
 	events.Opened = func(ec evio.Conn) (out []byte, opts evio.Options, action evio.Action) {
 		//fmt.Printf("opened: %v\n", ec.RemoteAddr())
-		opts.TCPKeepAlive = time.Minute * 25
+		if (*keepalive) > 0 {
+			opts.TCPKeepAlive = time.Second * (time.Duration(*keepalive))
+		}
 		ec.SetContext(&conn{})
 		return
 	}
@@ -98,18 +90,17 @@ func main() {
 
 	events.Data = func(ec evio.Conn, in []byte) (out []byte, action evio.Action) {
 		if in == nil {
-			log.Printf("wake from %s\n", ec.RemoteAddr())
+			fmt.Printf("wake from %s\n", ec.RemoteAddr())
 			return nil, evio.Close
 		}
 		c := ec.Context().(*conn)
 		data := c.is.Begin(in)
 		for {
-			leftover, response, err := parsemc(data, b52)
+			leftover, response, err := mcproto(data, b52)
 			if err != nil {
 				if err != ErrClose {
 					// bad thing happened
 					println(err.Error())
-					//out = appendresp(out, "500 Error", "", err.Error()+"\n")
 				}
 				action = evio.Close
 				break
@@ -121,43 +112,20 @@ func main() {
 			out = response
 			data = leftover
 		}
-
 		c.is.End(data)
 		return
 	}
 	var ssuf string
-	//if stdlib {
-	//	ssuf = "-net"
-	//}
+	if *stdlib {
+		ssuf = "-net"
+	}
 	addrs := []string{fmt.Sprintf("tcp"+ssuf+"://:%d", *port)}
-	//if unixsocket != "" {
-	//addrs = append(addrs, fmt.Sprintf("unix"+ssuf+"://%s", unixsocket))
-	//}
+	if *unixs != "" {
+		addrs = append(addrs, fmt.Sprintf("unix"+ssuf+"://%s", *unixs))
+	}
 	err = evio.Serve(events, addrs...)
 	if err != nil {
+		println(err.Error())
 		log.Fatal(err)
 	}
 }
-
-/*
-func serve(listener net.Listener, b52 mcproto.McEngine, mcparams string) {
-	go func() {
-		for {
-
-			conn, err := listener.Accept()
-
-			if err != nil {
-				fmt.Println("conn", err.Error())
-				if conn != nil {
-					conn.Close()
-				}
-				continue
-			} else {
-				//println("Accept")
-				go mcproto.ParseMc(conn, b52, mcparams)
-			}
-
-		}
-	}()
-}
-*/

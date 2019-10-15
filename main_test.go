@@ -11,7 +11,7 @@ import (
 //go test -race -run=Base
 func Test_Base(t *testing.T) {
 	go main()
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 	addr := ":11211"
 
 	// 2 clients

@@ -22,6 +22,7 @@ var (
 	cmdIncrB   = []byte("INCR")
 	cmdDecr    = []byte("decr")
 	cmdDecrB   = []byte("DECR")
+	cmdStats   = []byte("stats")
 
 	crlf     = []byte("\r\n")
 	space    = []byte(" ")
@@ -37,6 +38,7 @@ var (
 	resultError             = []byte("ERROR\r\n")
 	resultTouched           = []byte("TOUCHED\r\n")
 	resultClientErrorPrefix = []byte("CLIENT_ERROR ")
+	resultServerErrorPrefix = []byte("SERVER_ERROR ") //
 )
 
 var (
@@ -44,7 +46,8 @@ var (
 	ErrClose = errors.New("memcache: close")
 )
 
-func parsemc(b []byte, db McEngine) ([]byte, []byte, error) {
+//https://github.com/memcached/memcached/blob/master/doc/protocol.txt
+func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 	if i := bytes.IndexByte(b, '\n'); i >= 0 {
 		if i == 0 {
 			//if start from \n - read \n
@@ -103,9 +106,29 @@ func parsemc(b []byte, db McEngine) ([]byte, []byte, error) {
 			buf := bytes.NewBuffer([]byte{})
 			rw := bufio.NewWriter(buf)
 			_, err := db.Gets(args[1:], rw)
-			//if err != nil {
-			return b[i+1:], buf.Bytes(), err
 
+			return b[i+1:], buf.Bytes(), err
+		case bytes.HasPrefix(line, cmdStats):
+			str := "STAT version " + version + "\r\nEND\r\n"
+			return b[i+1:], []byte(str), nil
+		case bytes.HasPrefix(line, cmdDelete), bytes.HasPrefix(line, cmdDeleteB):
+			key, noreply, err := scanDeleteLine(line, bytes.HasPrefix(line, cmdDeleteB))
+			if err != nil {
+				return b, nil, err
+			}
+			deleted, noreply, _ := db.Delete([]byte(key), nil)
+			if !noreply {
+				if deleted {
+					return b[i+1:], resultDeleted, nil
+				}
+				// err mean not deleted
+				return b[i+1:], resultNotFound, nil
+
+			}
+		case bytes.HasPrefix(line, cmdIncr), bytes.HasPrefix(line, cmdIncrB):
+			return b[i+1:], resultError, nil
+		case bytes.HasPrefix(line, cmdDecr), bytes.HasPrefix(line, cmdDecrB):
+			return b[i+1:], resultError, nil
 		}
 		return b[i+1:], nil, nil
 	}
@@ -135,6 +158,65 @@ func scanSetLine(line []byte, isCap bool) (key string, flags uint32, exp int32, 
 	n, err := fmt.Sscanf(string(line), pattern, dest...)
 	if n != len(dest) {
 		err = errors.New("wrong set params" + string(line))
+	}
+	return
+}
+
+// scanDeleteLine populates it and returns the declared params of the item.
+// It does not read the bytes of the item.
+func scanDeleteLine(line []byte, isCap bool) (key string, noreply bool, err error) {
+	//set := ""
+	noreplys := ""
+	noreply = false
+	cmd := "delete"
+	if isCap {
+		cmd = "DELETE"
+	}
+	pattern := cmd + " %s %s\r\n"
+	dest := []interface{}{&key, &noreplys}
+	if bytes.Count(line, space) == 1 {
+		pattern = cmd + " %s\r\n"
+		dest = dest[:1]
+	}
+	if noreplys == "noreply" || noreplys == "NOREPLY" {
+		noreply = true
+	}
+	n, err := fmt.Sscanf(string(line), pattern, dest...)
+	if n != len(dest) {
+		err = errors.New(string(resultError))
+	}
+	return
+}
+
+// scanIncrDecrLine populates it and returns the declared params of the item.
+// It does not read the bytes of the item.
+func scanIncrDecrLine(line []byte, incr bool, isCap bool) (key string, val uint64, noreply bool, err error) {
+	//set := ""
+	noreplys := ""
+	noreply = false
+	cmd := "incr"
+	if !incr {
+		cmd = "decr"
+	}
+	if isCap {
+		cmd = "INCR"
+		if !incr {
+			cmd = "DECR"
+		}
+	}
+
+	pattern := cmd + " %s %d %s\r\n"
+	dest := []interface{}{&key, &val, &noreplys}
+	if bytes.Count(line, space) == 2 {
+		pattern = cmd + " %s %d\r\n"
+		dest = dest[:2]
+	}
+	if noreplys == "noreply" || noreplys == "NOREPLY" {
+		noreply = true
+	}
+	n, err := fmt.Sscanf(string(line), pattern, dest...)
+	if n != len(dest) {
+		err = errors.New(string(resultError))
 	}
 	return
 }

@@ -243,7 +243,7 @@ func (db *b52) Decr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint
 func (db *b52) Delete(key []byte, rw *bufio.ReadWriter) (isFound bool, noreply bool, err error) {
 	db.ttl.Del(key)
 	db.lru.Del(key)
-	_, err = db.ssd.Delete(key)
+	isFound, err = db.ssd.Delete(key)
 	return
 }
 

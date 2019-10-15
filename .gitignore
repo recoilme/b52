@@ -4,3 +4,4 @@ db
 master
 slave
 tst
+.DS_Store

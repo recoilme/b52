@@ -7,12 +7,10 @@ import (
 	"net/url"
 	"runtime/debug"
 	"strconv"
-	"time"
 
 	"github.com/dgraph-io/ristretto"
 
 	"github.com/coocood/freecache"
-	"github.com/recoilme/mcproto"
 	"github.com/recoilme/sniper"
 )
 
@@ -23,8 +21,19 @@ type b52 struct {
 	slave string
 }
 
+//McEngine  - any db implemented memcache proto
+type McEngine interface {
+	Get(key []byte, rw *bufio.ReadWriter) (value []byte, noreply bool, err error)
+	Gets(keys [][]byte, rw *bufio.Writer) (keysvals [][]byte, err error)
+	Set(key, value []byte, flags uint32, exp int32, size int, noreply bool, rw *bufio.ReadWriter) (noreplyresp bool, err error)
+	Incr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint64, isFound bool, noreply bool, err error)
+	Decr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint64, isFound bool, noreply bool, err error)
+	Delete(key []byte, rw *bufio.ReadWriter) (isFound bool, noreply bool, err error)
+	Close() error
+}
+
 // Newb52 - init database with params
-func Newb52(params, slaveadr string) (mcproto.McEngine, error) {
+func Newb52(params, slaveadr string) (McEngine, error) {
 	p, err := url.ParseQuery(params)
 	if err != nil {
 		log.Fatal(err)
@@ -34,7 +43,6 @@ func Newb52(params, slaveadr string) (mcproto.McEngine, error) {
 	if len(p["sizelru"]) > 0 {
 		sizelru = p["sizelru"][0]
 	}
-
 	lrusize, err := strconv.Atoi(sizelru)
 	if err != nil {
 		println("sizelru parse error, fallback to default, 100Mb", err.Error())
@@ -46,8 +54,6 @@ func Newb52(params, slaveadr string) (mcproto.McEngine, error) {
 	sizettl := "100"
 	if len(p["sizettl"]) > 0 {
 		sizettl = p["sizettl"][0]
-	} else {
-		println("sizettl not set, fallback to default, 100Mb")
 	}
 	ttlsize, err := strconv.Atoi(sizettl)
 	if err != nil {
@@ -60,8 +66,8 @@ func Newb52(params, slaveadr string) (mcproto.McEngine, error) {
 	dbdir := "db"
 	if len(p["dbdir"]) > 0 {
 		dbdir = p["dbdir"][0]
-		println("dbdir:", dbdir)
 	}
+	println("dbdir:", dbdir)
 
 	slave := ""
 	if len(slaveadr) > 0 {
@@ -69,11 +75,15 @@ func Newb52(params, slaveadr string) (mcproto.McEngine, error) {
 	}
 
 	db := &b52{}
-	ssd, err := sniper.Open(dbdir)
-	if err != nil {
-		return nil, err
+	if dbdir == "" {
+		db.ssd = nil
+	} else {
+		ssd, err := sniper.Open(dbdir)
+		if err != nil {
+			return nil, err
+		}
+		db.ssd = ssd
 	}
-	db.ssd = ssd
 
 	lru, err := ristretto.NewCache(&ristretto.Config{
 		MaxCost:     int64(lrusize),
@@ -105,12 +115,13 @@ func (db *b52) Get(key []byte, rw *bufio.ReadWriter) (value []byte, noreply bool
 		return value, false, nil
 	}
 	err = nil // clear key not found
-
-	value, err = db.ssd.Get(key)
+	if db.ssd != nil {
+		value, err = db.ssd.Get(key)
+	}
 	return
 }
 
-func (db *b52) Gets(keys [][]byte, rw *bufio.ReadWriter) (kv [][]byte, err error) {
+func (db *b52) Gets(keys [][]byte, rw *bufio.Writer) (kv [][]byte, err error) {
 	//t2 := time.Now()
 	/*
 		var wg sync.WaitGroup
@@ -159,8 +170,10 @@ func (db *b52) Gets(keys [][]byte, rw *bufio.ReadWriter) (kv [][]byte, err error
 			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
 			continue
 		}
-		if value, errssd := db.ssd.Get(key); errssd == nil {
-			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+		if db.ssd != nil {
+			if value, errssd := db.ssd.Get(key); errssd == nil {
+				fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+			}
 		}
 	}
 
@@ -196,47 +209,48 @@ func (db *b52) Gets(keys [][]byte, rw *bufio.ReadWriter) (kv [][]byte, err error
 // Set store k/v with expire time in memory cache
 // Persistent k/v - stored on disk
 func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply bool, rw *bufio.ReadWriter) (noreplyresp bool, err error) {
-	t1 := time.Now()
 
 	if exp > 0 {
 		err = db.ttl.Set(key, value, int(exp))
 		return
 	}
 	// if key pesistent (no TTL)
-	err = db.ssd.Set(key, value) // store on disk
-
-	// update on lru if any
-	if _, ok := db.lru.Get(key); ok {
-		// if in LRU cache - update
+	if db.ssd != nil {
+		err = db.ssd.Set(key, value) // store on disk
+		// update on lru if any
+		if _, ok := db.lru.Get(key); ok {
+			// if in LRU cache - update
+			db.lru.Set(key, value, 0)
+		}
+	} else {
+		//no disk store
 		db.lru.Set(key, value, 0)
-	}
-	t2 := time.Now()
-	if db.slave != "" && flags != 1 {
-		//mc := memcache.New(db.slave)
-		//mc.MaxIdleConns = 1
-		//go mc.Set(&memcache.Item{Key: string(key), Value: value, Flags: 1, Expiration: exp})
-	}
-	t3 := time.Now()
-	if t3.Sub(t1) > (20 * time.Millisecond) {
-		println("set", t3.Sub(t1), t2.Sub(t1))
 	}
 
 	return
 }
 
 func (db *b52) Incr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint64, isFound bool, noreply bool, err error) {
+	result, err = db.ssd.Incr(key, value)
 	return
 }
 
 func (db *b52) Decr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint64, isFound bool, noreply bool, err error) {
+	result, err = db.ssd.Decr(key, value)
 	return
 }
 
 func (db *b52) Delete(key []byte, rw *bufio.ReadWriter) (isFound bool, noreply bool, err error) {
+	db.ttl.Del(key)
+	db.lru.Del(key)
+	_, err = db.ssd.Delete(key)
 	return
 }
+
 func (db *b52) Close() (err error) {
-	err = db.ssd.Close()
+	if db.ssd != nil {
+		err = db.ssd.Close()
+	}
 	if db.slave != "" {
 		println("Close")
 	}

@@ -4,12 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"github.com/recoilme/mcproto"
+	"github.com/tidwall/evio"
 )
 
 var (
@@ -20,19 +20,25 @@ var (
 	params   = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: sizelru=100&sizettl=100&dbdir=db")
 )
 
+type conn struct {
+	is   evio.InputStream
+	addr string
+}
+
 func main() {
 	flag.Parse()
+	//port := 11211
 
-	address := fmt.Sprintf("%s:%d", *laddr, *port)
-	network := "tcp"
-	listener, err := net.Listen(network, address)
-	if err != nil {
-		log.Fatalf("failed to serve: %s", err.Error())
-		return
-	}
+	//address := fmt.Sprintf("%s:%d", *laddr, *port)
+	//network := "tcp"
+	//listener, err := net.Listen(network, address)
+	//if err != nil {
+	//	log.Fatalf("failed to serve: %s", err.Error())
+	//	return
+	//}
 
-	var b52 mcproto.McEngine
-	b52, err = Newb52(*params, *slaveadr)
+	var b52 McEngine
+	b52, err := Newb52(*params, *slaveadr)
 	if err != nil {
 		log.Fatalf("failed to create database: %s", err.Error())
 	}
@@ -56,12 +62,84 @@ func main() {
 		os.Exit(1)
 	}()
 	// start service
-	defer listener.Close()
-	fmt.Printf("\nServer is listening on %s %s \n", network, address)
-	serve(listener, b52, "buf=81920&deadline=1200000")
-	select {}
+	//defer listener.Close()
+	//fmt.Printf("\nServer is listening on %s %s \n", network, address)
+	//serve(listener, b52, "buf=81920&deadline=1200000")
+	//select {}
+	var events evio.Events
+	balance := "random"
+	switch balance {
+	default:
+		log.Fatalf("invalid -balance flag: '%v'", balance)
+	case "random":
+		events.LoadBalance = evio.Random
+	case "round-robin":
+		events.LoadBalance = evio.RoundRobin
+	case "least-connections":
+		events.LoadBalance = evio.LeastConnections
+	}
+	loops := -1
+	events.NumLoops = loops
+	events.Serving = func(srv evio.Server) (action evio.Action) {
+		fmt.Printf("server started on port %d (loops: %d)\n", *port, srv.NumLoops)
+
+		return
+	}
+	events.Opened = func(ec evio.Conn) (out []byte, opts evio.Options, action evio.Action) {
+		//fmt.Printf("opened: %v\n", ec.RemoteAddr())
+		opts.TCPKeepAlive = time.Minute * 25
+		ec.SetContext(&conn{})
+		return
+	}
+	events.Closed = func(ec evio.Conn, err error) (action evio.Action) {
+		//fmt.Printf("closed: %v\n", ec.RemoteAddr())
+		return
+	}
+
+	events.Data = func(ec evio.Conn, in []byte) (out []byte, action evio.Action) {
+		if in == nil {
+			log.Printf("wake from %s\n", ec.RemoteAddr())
+			return nil, evio.Close
+		}
+		c := ec.Context().(*conn)
+		data := c.is.Begin(in)
+		for {
+			leftover, response, err := parsemc(data, b52)
+			if err != nil {
+				if err != ErrClose {
+					// bad thing happened
+					println(err.Error())
+					//out = appendresp(out, "500 Error", "", err.Error()+"\n")
+				}
+				action = evio.Close
+				break
+			} else if len(leftover) == len(data) {
+				// request not ready, yet
+				break
+			}
+			// handle the request
+			out = response
+			data = leftover
+		}
+
+		c.is.End(data)
+		return
+	}
+	var ssuf string
+	//if stdlib {
+	//	ssuf = "-net"
+	//}
+	addrs := []string{fmt.Sprintf("tcp"+ssuf+"://:%d", *port)}
+	//if unixsocket != "" {
+	//addrs = append(addrs, fmt.Sprintf("unix"+ssuf+"://%s", unixsocket))
+	//}
+	err = evio.Serve(events, addrs...)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
+/*
 func serve(listener net.Listener, b52 mcproto.McEngine, mcparams string) {
 	go func() {
 		for {
@@ -69,7 +147,7 @@ func serve(listener net.Listener, b52 mcproto.McEngine, mcparams string) {
 			conn, err := listener.Accept()
 
 			if err != nil {
-				//fmt.Println("conn", err)
+				fmt.Println("conn", err.Error())
 				if conn != nil {
 					conn.Close()
 				}
@@ -82,3 +160,4 @@ func serve(listener net.Listener, b52 mcproto.McEngine, mcparams string) {
 		}
 	}()
 }
+*/

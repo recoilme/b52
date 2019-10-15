@@ -2,30 +2,17 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"net"
 	"testing"
 	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
-	"github.com/recoilme/mcproto"
 )
 
 //go test -race -run=Base
 func Test_Base(t *testing.T) {
+	go main()
+	time.Sleep(2 * time.Second)
 	addr := ":11211"
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("failed to serve: %s", err.Error())
-		return
-	}
-	var b52 mcproto.McEngine
-	b52, err = Newb52("sizelru=10&sizettl=90&dbdir=tst", "")
-	if err != nil {
-		log.Fatalf("failed to create database: %s", err.Error())
-	}
-	defer listener.Close()
-	serve(listener, b52, "buf=4096&deadline=60001")
 
 	// 2 clients
 	mc := memcache.New(addr)
@@ -49,7 +36,7 @@ func Test_Base(t *testing.T) {
 
 	//multi set from clients
 	println("multi set from clients")
-	multisize := 500
+	multisize := 1000
 	for i := 0; i <= multisize; i++ {
 		s := fmt.Sprintf("%d", i)
 		item := &memcache.Item{Key: s, Value: []byte(s), Flags: 0, Expiration: 0}
@@ -108,10 +95,44 @@ func Test_Base(t *testing.T) {
 		}
 	}
 
-	//close
-	err = b52.Close()
-	if err != nil {
-		t.Error(err)
+	v, err = mc.Get("not exists")
+	if err == nil {
+		t.Error("must be not exist")
 	}
+
+	err = mc.Set(&memcache.Item{Key: string("exists"), Value: []byte("exists"), Flags: 0, Expiration: 0})
+	if err != nil {
+		t.Error("must be no err")
+	}
+	keys := make([]string, 0)
+	keys = append(keys, "some1")
+	keys = append(keys, "some2")
+	items, err = mc.GetMulti(keys)
+	if err != nil {
+		t.Error("must be no err")
+	}
+	err = mc.Set(&memcache.Item{Key: string("exists"), Value: []byte("exists2"), Flags: 0, Expiration: 0})
+	if err != nil {
+		t.Error("must be no err")
+	}
+	keys = append(keys, "exists")
+	items, err = mc.GetMulti(keys)
+	if err != nil {
+		t.Error("must be no err")
+	}
+	for _, item := range items {
+		if item.Key == "exists" {
+			if string(item.Value) != "exists2" {
+				t.Error("no exists2")
+			} else {
+				println("ok exists2")
+			}
+		}
+	}
+	//close
+	//err = b52.Close()
+	//if err != nil {
+	//t.Error(err)
+	//}
 
 }

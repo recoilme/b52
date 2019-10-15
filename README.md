@@ -22,26 +22,28 @@ To start using `b52`, install Go and run `go get`:
 
 ```sh
 $ go get -u github.com/recoilme/b52
-$ go build
+$ go build or go install
 ```
 
 This will retrieve and build the server.
 
 ## Starting
 
-Use `./b52 --help` for full list of params.
+Use `./b52 --help` for full list of params. Example:
 
 ```sh
 ./b52 -p 11212 -params "sizelru=10&sizettl=10&dbdir="
-#Start server on port 11212 with 10Mb lru and ttl size, without persistent database.
+# Start server on port 11212 with 10Mb lru and ttl cache size, without persistent database.
 ```
 
 or just ./b52 - for start with default params
 
 ## How it work
 
-`b52` is a layered database composed of a sniper, ristretto and freecache. 
+`b52` is a layered database composed of a sniper, ristretto and freecache.
 When b52 prepared properly, the ingredients separate into three distinctly visible layers.
+
+It use [evio](https://github.com/tidwall/evio) for network communications.
 
 [sniper](https://github.com/recoilme/sniper) - [fast](https://github.com/recoilme/sniper#performance), persistant on disk storage
 
@@ -86,4 +88,3 @@ Vadim Kulibaba [@recoilme](https://github.com/recoilme)
 ## License
 
 `b52` source code is available under the MIT [License](/LICENSE).
-

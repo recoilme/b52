@@ -47,9 +47,9 @@ func main() {
 	go func() {
 		q := <-quit
 		fmt.Printf("\nRECEIVED SIGNAL: %s\n", q)
-		//ignore broken pipe
+		//ignore broken pipe?
 		if q == syscall.SIGPIPE || q.String() == "broken pipe" {
-			return
+			//return
 		}
 		err = b52.Close()
 		if err != nil {
@@ -119,7 +119,7 @@ func main() {
 	if *stdlib {
 		ssuf = "-net"
 	}
-	addrs := []string{fmt.Sprintf("tcp"+ssuf+"://:%d", *port)}
+	addrs := []string{fmt.Sprintf("tcp"+ssuf+"://:%d", *port)} //?reuseport=true
 	if *unixs != "" {
 		addrs = append(addrs, fmt.Sprintf("unix"+ssuf+"://%s", *unixs))
 	}

@@ -8,6 +8,7 @@ require (
 	github.com/coocood/freecache v1.1.0
 	github.com/dgraph-io/ristretto v0.0.0-20191001142246-d963fa241740
 	github.com/kavu/go_reuseport v1.4.0 // indirect
+	github.com/rainycape/memcache v0.0.0-20150622160815-1031fa0ce2f2
 
 	github.com/recoilme/sniper v0.1.1
 	github.com/tidwall/evio v1.0.2

@@ -64,9 +64,9 @@ In Freecache and Ristretto memory is preallocated and it's size depends from you
 
 ## Disk usage
 
-Sniper has a minimum 8 byte overhead on every entry. But it allocate space in power of 2, and try to reuse space, if value grow. And sniper will try to reuse space from deleted/evicted records.
+Sniper has a minimum 8 byte overhead on every entry. But it allocate space in power of 2, and try to reuse space, if value grow. Also, sniper will try to reuse space from deleted/evicted records.
 
-## Usage (telnet example)
+## Telnet example
 
 ```
 telnet localhost 11211

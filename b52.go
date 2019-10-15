@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"log"
 	"net/url"
@@ -23,12 +24,12 @@ type b52 struct {
 
 //McEngine  - any db implemented memcache proto
 type McEngine interface {
-	Get(key []byte, rw *bufio.ReadWriter) (value []byte, noreply bool, err error)
-	Gets(keys [][]byte, rw *bufio.Writer) (keysvals [][]byte, err error)
-	Set(key, value []byte, flags uint32, exp int32, size int, noreply bool, rw *bufio.ReadWriter) (noreplyresp bool, err error)
-	Incr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint64, isFound bool, noreply bool, err error)
-	Decr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint64, isFound bool, noreply bool, err error)
-	Delete(key []byte, rw *bufio.ReadWriter) (isFound bool, noreply bool, err error)
+	Get(key []byte) (value []byte, err error)
+	Gets(keys [][]byte) (response []byte, err error)
+	Set(key, value []byte, flags uint32, exp int32, size int, noreply bool) (err error)
+	Incr(key []byte, value uint64) (result uint64, err error)
+	Decr(key []byte, value uint64) (result uint64, err error)
+	Delete(key []byte) (isFound bool, err error)
 	Close() error
 }
 
@@ -107,108 +108,48 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 }
 
 // Get return value from lru or ttl cache or from disk storage
-func (db *b52) Get(key []byte, rw *bufio.ReadWriter) (value []byte, noreply bool, err error) {
+func (db *b52) Get(key []byte) (value []byte, err error) {
 	if val, ok := db.lru.Get(key); ok {
-		return val.([]byte), false, nil
+		return val.([]byte), nil
 	}
 	if value, err := db.ttl.Get(key); err == nil {
-		return value, false, nil
+		return value, nil
 	}
-	err = nil // clear key not found
+	err = nil // clear key not found err
 	if db.ssd != nil {
 		value, err = db.ssd.Get(key)
 	}
 	return
 }
 
-func (db *b52) Gets(keys [][]byte, rw *bufio.Writer) (kv [][]byte, err error) {
-	//t2 := time.Now()
-	/*
-		var wg sync.WaitGroup
-
-		//response := make(chan [][]byte)
-		read := func(key []byte) {
-			defer wg.Done()
-
-			//res := make([][]byte, 0)
-			if val, ok := db.lru.Get(key); ok {
-				//res = append(res, key)
-				//res = append(res, val.([]byte))
-				//response <- res
-				//	fmt.Fprintf(b, "VALUE %s 0 %d\r\n%s\r\n", key, len(val.([]byte)), val.([]byte))
-				//bufPool.Put(b)
-				_ = val
-				return //val.([]byte), false, nil
-			}
-			if value, errttl := db.ttl.Get(key); errttl == nil {
-				//res = append(res, key)
-				//res = append(res, value)
-				//response <- res
-				//fmt.Fprintf(b, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
-				//bufPool.Put(b)
-				_ = value
-				return
-			}
-			value, errssd := db.ssd.Get(key)
-			if errssd == nil {
-				_ = value
-				//res = append(res, key)
-				//	res = append(res, value)
-				//response <- res
-				//fmt.Fprintf(b, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
-				//bufPool.Put(b)
-			}
-		}
-		wg.Add(len(keys))
-	*/
+func (db *b52) Gets(keys [][]byte) (resp []byte, err error) {
+	//mutex?
+	buf := bytes.NewBuffer([]byte{})
+	w := bufio.NewWriter(buf)
 	for _, key := range keys {
 		if val, ok := db.lru.Get(key); ok {
-			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(val.([]byte)), val.([]byte))
+			fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(val.([]byte)), val.([]byte))
 			continue
 		}
 		if value, errttl := db.ttl.Get(key); errttl == nil {
-			fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+			fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
 			continue
 		}
 		if db.ssd != nil {
 			if value, errssd := db.ssd.Get(key); errssd == nil {
-				fmt.Fprintf(rw, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+				fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
 			}
 		}
 	}
+	w.Write([]byte("END\r\n"))
+	w.Flush()
 
-	//wg.Wait()
-	_, err = rw.Write([]byte("END\r\n"))
-	if err != nil {
-		fmt.Println("rw.Write", err.Error())
-	}
-	err = rw.Flush()
-	if err != nil {
-		fmt.Println("rw.Flush", err.Error())
-	}
-	//close(response)
-	//}()
-	/*done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for resp := range response {
-			kv = append(kv, resp...)
-		}
-	}()
-
-	<-done*/
-
-	//t3 := time.Now()
-	//if t3.Sub(t2) > (1 * time.Millisecond) {
-	//	println("get is slow!:", t3.Sub(t2).Milliseconds())
-	//}
-	return kv, nil
-
+	return buf.Bytes(), nil
 }
 
 // Set store k/v with expire time in memory cache
 // Persistent k/v - stored on disk
-func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply bool, rw *bufio.ReadWriter) (noreplyresp bool, err error) {
+func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply bool) (err error) {
 
 	if exp > 0 {
 		err = db.ttl.Set(key, value, int(exp))
@@ -222,28 +163,33 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 			// if in LRU cache - update
 			db.lru.Set(key, value, 0)
 		}
-	} else {
-		//no disk store
-		db.lru.Set(key, value, 0)
+		return
 	}
-
+	//no disk store
+	db.lru.Set(key, value, 0)
 	return
 }
 
-func (db *b52) Incr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint64, isFound bool, noreply bool, err error) {
-	result, err = db.ssd.Incr(key, value)
+func (db *b52) Incr(key []byte, value uint64) (result uint64, err error) {
+	if db.ssd != nil {
+		result, err = db.ssd.Incr(key, value)
+	}
 	return
 }
 
-func (db *b52) Decr(key []byte, value uint64, rw *bufio.ReadWriter) (result uint64, isFound bool, noreply bool, err error) {
-	result, err = db.ssd.Decr(key, value)
+func (db *b52) Decr(key []byte, value uint64) (result uint64, err error) {
+	if db.ssd != nil {
+		result, err = db.ssd.Decr(key, value)
+	}
 	return
 }
 
-func (db *b52) Delete(key []byte, rw *bufio.ReadWriter) (isFound bool, noreply bool, err error) {
-	db.ttl.Del(key)
+func (db *b52) Delete(key []byte) (isFound bool, err error) {
+	isFound = db.ttl.Del(key)
 	db.lru.Del(key)
-	isFound, err = db.ssd.Delete(key)
+	if db.ssd != nil {
+		isFound, err = db.ssd.Delete(key)
+	}
 	return
 }
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -73,7 +72,7 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 				return b, nil, nil
 			}
 
-			_, err = db.Set([]byte(key), b[i+1:i+1+size], flags, exp, size, noreply, nil)
+			err = db.Set([]byte(key), b[i+1:i+1+size], flags, exp, size, noreply)
 			//println("set", string(key), size, string(b[i+1:i+1+size]), len(string(b[i+1:i+1+size])), err)
 			if err != nil {
 				return b[mustlen:], resultNotStored, err
@@ -88,26 +87,21 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			if cntspace == 1 {
 				key := line[(bytes.Index(line, space) + 1) : len(line)-2]
 				//log.Println("'" + string(key) + "'")
-				value, noreply, err := db.Get(key, nil)
+				value, err := db.Get(key)
 				buf := bytes.NewBuffer([]byte{})
-				if !noreply && err == nil && value != nil {
+				if err == nil && value != nil {
 					//response:=new bytes.Buffer()
 					fmt.Fprintf(buf, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
 				}
-				if !noreply {
-					_, err = buf.Write(resultEnd)
-				}
+				buf.Write(resultEnd)
 				return b[i+1:], buf.Bytes(), nil
 			}
 			//multiline get/gets
 			args := bytes.Split(line[:len(line)-2], space)
-			//strings.Split(string(line), " ")
+			response, err := db.Gets(args[1:])
 
-			buf := bytes.NewBuffer([]byte{})
-			rw := bufio.NewWriter(buf)
-			_, err := db.Gets(args[1:], rw)
+			return b[i+1:], response, err
 
-			return b[i+1:], buf.Bytes(), err
 		case bytes.HasPrefix(line, cmdStats):
 			str := "STAT version " + version + "\r\nEND\r\n"
 			return b[i+1:], []byte(str), nil
@@ -116,7 +110,7 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			if err != nil {
 				return b, nil, err
 			}
-			deleted, noreply, _ := db.Delete([]byte(key), nil)
+			deleted, _ := db.Delete([]byte(key))
 			if !noreply {
 				if deleted {
 					return b[i+1:], resultDeleted, nil

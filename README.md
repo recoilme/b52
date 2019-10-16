@@ -80,6 +80,66 @@ END
 close
 ```
 
+## mc-benchmark
+
+[mc-benchmark](https://github.com/antirez/mc-benchmark)
+```
+test #1 (default params)
+
+./b52 -p 11222 -loops 10
+sizelru: 100 Mb
+sizettl: 100 Mb
+dbdir: db
+b52 server started on port 11222 (loops: 10)
+
+./mc-benchmark -p 11222
+
+====== SET ======
+  10000 requests completed in 0.10 seconds
+  50 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+56.39% <= 0 milliseconds
+95.39% <= 1 milliseconds
+100.00% <= 2 milliseconds
+101010.10 requests per second
+
+====== GET ======
+  10014 requests completed in 0.08 seconds
+  50 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+60.25% <= 0 milliseconds
+100.00% <= 1 milliseconds
+123629.63 requests per second
+
+test #2 (without ssd)
+./b52 -p 11222 -loops 10 -params "sizelru=1024&sizettl=1024&dbdir="
+./mc-benchmark -p 11222
+
+====== SET ======
+  10014 requests completed in 0.08 seconds
+  50 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+60.14% <= 0 milliseconds
+100.00% <= 1 milliseconds
+122121.95 requests per second
+
+====== GET ======
+  10011 requests completed in 0.07 seconds
+  50 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+63.75% <= 0 milliseconds
+100.00% <= 1 milliseconds
+135283.78 requests per second
+```
+
 
 ## Contact
 

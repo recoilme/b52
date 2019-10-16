@@ -74,6 +74,10 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 
 			err = db.Set([]byte(key), b[i+1:i+1+size], flags, exp, size, noreply)
 			//println("set", string(key), size, string(b[i+1:i+1+size]), len(string(b[i+1:i+1+size])), err)
+			if noreply {
+				//println("noreply set")
+				return b[mustlen:], nil, err
+			}
 			if err != nil {
 				return b[mustlen:], resultNotStored, err
 			}
@@ -111,14 +115,15 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 				return b, nil, err
 			}
 			deleted, _ := db.Delete([]byte(key))
-			if !noreply {
-				if deleted {
-					return b[i+1:], resultDeleted, nil
-				}
-				// err mean not deleted
-				return b[i+1:], resultNotFound, nil
-
+			//if !noreply {
+			_ = noreply
+			if deleted {
+				return b[i+1:], resultDeleted, nil
 			}
+			// err mean not deleted
+			return b[i+1:], resultNotFound, nil
+
+			//}
 		case bytes.HasPrefix(line, cmdIncr), bytes.HasPrefix(line, cmdIncrB):
 			return b[i+1:], resultError, nil
 		case bytes.HasPrefix(line, cmdDecr), bytes.HasPrefix(line, cmdDecrB):
@@ -142,14 +147,15 @@ func scanSetLine(line []byte, isCap bool) (key string, flags uint32, exp int32, 
 	}
 	pattern := cmd + " %s %d %d %d %s\r\n"
 	dest := []interface{}{&key, &flags, &exp, &size, &noreplys}
+
 	if bytes.Count(line, space) == 4 {
 		pattern = cmd + " %s %d %d %d\r\n"
 		dest = dest[:4]
 	}
+	n, err := fmt.Sscanf(string(line), pattern, dest...)
 	if noreplys == "noreply" || noreplys == "NOREPLY" {
 		noreply = true
 	}
-	n, err := fmt.Sscanf(string(line), pattern, dest...)
 	if n != len(dest) {
 		err = errors.New("wrong set params" + string(line))
 	}
@@ -172,10 +178,10 @@ func scanDeleteLine(line []byte, isCap bool) (key string, noreply bool, err erro
 		pattern = cmd + " %s\r\n"
 		dest = dest[:1]
 	}
+	n, err := fmt.Sscanf(string(line), pattern, dest...)
 	if noreplys == "noreply" || noreplys == "NOREPLY" {
 		noreply = true
 	}
-	n, err := fmt.Sscanf(string(line), pattern, dest...)
 	if n != len(dest) {
 		err = errors.New(string(resultError))
 	}
@@ -205,10 +211,11 @@ func scanIncrDecrLine(line []byte, incr bool, isCap bool) (key string, val uint6
 		pattern = cmd + " %s %d\r\n"
 		dest = dest[:2]
 	}
+
+	n, err := fmt.Sscanf(string(line), pattern, dest...)
 	if noreplys == "noreply" || noreplys == "NOREPLY" {
 		noreply = true
 	}
-	n, err := fmt.Sscanf(string(line), pattern, dest...)
 	if n != len(dest) {
 		err = errors.New(string(resultError))
 	}

@@ -5,13 +5,12 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"net"
 	"net/url"
 	"runtime/debug"
 	"strconv"
-	"time"
 
 	"github.com/dgraph-io/ristretto"
-	"github.com/rainycape/memcache"
 
 	"github.com/coocood/freecache"
 	"github.com/recoilme/sniper"
@@ -21,7 +20,7 @@ type b52 struct {
 	ssd   *sniper.Store
 	lru   *ristretto.Cache
 	ttl   *freecache.Cache
-	slave *memcache.Client
+	slave net.Conn
 }
 
 //McEngine  - any db implemented memcache proto
@@ -103,20 +102,11 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 
 	if slave != "" {
 
-		memc, errSlave := memcache.New(slave)
-		if errSlave == nil {
-			memc.SetTimeout(10 * time.Second)
-			errSlave := memc.Set(&memcache.Item{Key: "__test__", Value: []byte("__test__"), Flags: 0, Expiration: 0})
-			if errSlave == nil {
-				println("set slave at:", slave)
-				db.slave = memc
-			} else {
-				println("slave:", errSlave.Error())
-			}
-		} else {
-			println("slave:", errSlave.Error())
+		c, err := net.Dial("tcp", slave)
+		if err != nil {
+			panic(err)
 		}
-
+		db.slave = c
 	}
 
 	return db, nil
@@ -165,6 +155,7 @@ func (db *b52) Gets(keys [][]byte) (resp []byte, err error) {
 // Set store k/v with expire time in memory cache
 // Persistent k/v - stored on disk
 func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply bool) (err error) {
+	//println("set", string(key), string(value))
 	if exp > 0 {
 		err = db.ttl.Set(key, value, int(exp))
 		return
@@ -179,7 +170,16 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 		}
 		if db.slave != nil && flags != 42 {
 			//looks stupid
-			db.slave.Set(&memcache.Item{Key: string(key), Value: value, Flags: 42, Expiration: exp})
+			buf := bytes.NewBuffer([]byte{})
+			w := bufio.NewWriter(buf)
+
+			fmt.Fprintf(w, "set %s 42 0 %d\r\n%s\r\n", key, len(value), value)
+			w.Flush()
+			n, e := db.slave.Write(buf.Bytes())
+			//e := db.slave.Set(&memcache.Item{Key: string(key), Value: value, Flags: 42, Expiration: exp})
+			if e != nil {
+				println("slave err", e.Error(), n)
+			}
 		}
 		return
 	}
@@ -210,7 +210,7 @@ func (db *b52) Delete(key []byte) (isFound bool, err error) {
 		if isFound {
 			if db.slave != nil {
 				//looks stupid
-				go db.slave.Delete(string(key))
+				//go db.slave.Delete(string(key))
 				//errSlave := mc.Set(&memcache.Item{Key: string(key), Value: value, Flags: 1, Expiration: exp})
 				//if errSlave != nil {
 				//println(err.Error())

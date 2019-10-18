@@ -80,6 +80,7 @@ func main() {
 		if (*keepalive) > 0 {
 			opts.TCPKeepAlive = time.Second * (time.Duration(*keepalive))
 		}
+		//opts.ReuseInputBuffer = true // don't do it!
 		ec.SetContext(&conn{})
 		return
 	}
@@ -95,12 +96,13 @@ func main() {
 		}
 		c := ec.Context().(*conn)
 		data := c.is.Begin(in)
+		responses := make([]byte, 0)
 		for {
 			leftover, response, err := mcproto(data, b52)
 			if err != nil {
 				if err != ErrClose {
 					// bad thing happened
-					println(err.Error())
+					fmt.Println(err.Error())
 				}
 				action = evio.Close
 				break
@@ -109,9 +111,13 @@ func main() {
 				break
 			}
 			// handle the request
-			out = response
+			//println("handle the request", string(response))
+			responses = append(responses, response...)
+			//out = response
 			data = leftover
 		}
+		//println("handle the responses", string(responses))
+		out = responses
 		c.is.End(data)
 		return
 	}
@@ -125,7 +131,7 @@ func main() {
 	}
 	err = evio.Serve(events, addrs...)
 	if err != nil {
-		println(err.Error())
+		fmt.Println(err.Error())
 		log.Fatal(err)
 	}
 }

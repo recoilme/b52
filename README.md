@@ -233,3 +233,4 @@ Vadim Kulibaba [@recoilme](https://github.com/recoilme)
 ## License
 
 `b52` source code is available under the MIT [License](/LICENSE).
+

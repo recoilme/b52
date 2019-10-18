@@ -47,17 +47,21 @@ var (
 
 //https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
+
 	if i := bytes.IndexByte(b, '\n'); i >= 0 {
 		if i == 0 {
 			//if start from \n - read \n
+			//fmt.Println("start from \n - read n")
 			return b[i+1:], nil, nil
 		}
 		line := b[:i+1]
-		//print(string(line))
 
 		switch {
+		default:
+			//fmt.Println(string(line))
 		case bytes.HasPrefix(line, cmdClose), bytes.HasPrefix(line, cmdCloseB):
 			//close
+			//fmt.Println("close")
 			return b, nil, ErrClose
 		case bytes.HasPrefix(line, cmdSet), bytes.HasPrefix(line, cmdSetB):
 			key, flags, exp, size, noreply, err := scanSetLine(line, bytes.HasPrefix(line, cmdSetB))
@@ -68,22 +72,27 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			mustlen := i + 1 + size + 2 // pos(\n)+size+\r\n
 			if len(b) < mustlen {
 				//incomplete set, wait for all data
-				//println("incomplete set", len(b), mustlen)
+				//fmt.Println("incomplete set", len(b), mustlen)
 				return b, nil, nil
 			}
+			//if size > 1000 {
+			//fmt.Println("set big:", (key), "'"+string(b[i+1:i+1+size])+"'", size, len(b[i+1:i+1+size]))
+			//return b[mustlen:], resultNotStored, nil
+			//}
 
 			err = db.Set([]byte(key), b[i+1:i+1+size], flags, exp, size, noreply)
 			//println("set", string(key), size, string(b[i+1:i+1+size]), len(string(b[i+1:i+1+size])), err)
 			if noreply {
-				//println("noreply set")
+				//fmt.Println("noreply set")
 				return b[mustlen:], nil, err
 			}
 			if err != nil {
+				//fmt.Println(err.Error())
 				return b[mustlen:], resultNotStored, err
 			}
 			return b[mustlen:], resultStored, err
 		case bytes.HasPrefix(line, cmdGet), bytes.HasPrefix(line, cmdGetB), bytes.HasPrefix(line, cmdGets), bytes.HasPrefix(line, cmdGetsB):
-			//println("get")
+			//fmt.Println("get")
 			cntspace := bytes.Count(line, space)
 			if cntspace == 0 {
 				return b, nil, errors.New("mailformed get request, no spaces")
@@ -102,7 +111,12 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			}
 			//multiline get/gets
 			args := bytes.Split(line[:len(line)-2], space)
+			//fmt.Println("get args:", len(args))
 			response, err := db.Gets(args[1:])
+			//fmt.Println("get response:", string(response))
+			if err != nil {
+				fmt.Println("get err", err.Error())
+			}
 
 			return b[i+1:], response, err
 
@@ -131,7 +145,7 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 		}
 		return b[i+1:], nil, nil
 	}
-	//no line in request - return
+
 	return b, nil, nil
 }
 

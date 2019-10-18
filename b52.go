@@ -178,7 +178,7 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 			n, e := db.slave.Write(buf.Bytes())
 			//e := db.slave.Set(&memcache.Item{Key: string(key), Value: value, Flags: 42, Expiration: exp})
 			if e != nil {
-				println("slave err", e.Error(), n)
+				fmt.Println("slave err", e.Error(), n)
 			}
 		}
 		return

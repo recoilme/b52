@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -13,6 +15,33 @@ func Test_Base(t *testing.T) {
 	go main()
 	time.Sleep(5 * time.Second)
 	addr := ":11211"
+
+	//pipeline
+
+	c, err := net.Dial("tcp", addr)
+	if err != nil {
+		panic(err)
+	}
+	defer c.Close()
+
+	rd := bufio.NewReader(c)
+	w := bufio.NewWriter(c)
+
+	fmt.Fprintf(w, "set c 0 0 1\r\n1\r\nset d 0 0 1\r\n2\r\n")
+	err = w.Flush()
+	if err != nil {
+		panic(err)
+	}
+	p := make([]byte, 1024)
+	n, err := rd.Read(p)
+	if err != nil {
+		panic(err)
+	}
+
+	if n != 16 {
+		println(n, len(p))
+		panic("err pipelining")
+	}
 
 	// 2 clients
 	mc := memcache.New(addr)

@@ -167,7 +167,7 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 		//if _, ok := db.lru.Get(key); ok {
 		// if in LRU cache - update
 		if err == nil { //slow set prefer then slow get?
-			db.lru.Set(key, value, 0)
+			//db.lru.Set(key, value, 0)
 		}
 		//}
 		if db.slave != nil && flags != 42 && err == nil {

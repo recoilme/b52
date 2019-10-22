@@ -164,11 +164,13 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 	if db.ssd != nil {
 		err = db.ssd.Set(key, value) // store on disk
 		// update on lru if any
-		if _, ok := db.lru.Get(key); ok {
-			// if in LRU cache - update
+		//if _, ok := db.lru.Get(key); ok {
+		// if in LRU cache - update
+		if err == nil { //slow set prefer then slow get?
 			db.lru.Set(key, value, 0)
 		}
-		if db.slave != nil && flags != 42 {
+		//}
+		if db.slave != nil && flags != 42 && err == nil {
 			//looks stupid
 			buf := bytes.NewBuffer([]byte{})
 			w := bufio.NewWriter(buf)
@@ -207,14 +209,17 @@ func (db *b52) Delete(key []byte) (isFound bool, err error) {
 	db.lru.Del(key)
 	if db.ssd != nil {
 		isFound, err = db.ssd.Delete(key)
-		if isFound {
-			if db.slave != nil {
-				//looks stupid
-				//go db.slave.Delete(string(key))
-				//errSlave := mc.Set(&memcache.Item{Key: string(key), Value: value, Flags: 1, Expiration: exp})
-				//if errSlave != nil {
-				//println(err.Error())
-				//}
+
+		if db.slave != nil && isFound && err == nil {
+			//looks stupid
+			buf := bytes.NewBuffer([]byte{})
+			w := bufio.NewWriter(buf)
+
+			fmt.Fprintf(w, "delete %s\r\n", key)
+			w.Flush()
+			n, e := db.slave.Write(buf.Bytes())
+			if e != nil {
+				fmt.Println("slave err", e.Error(), n)
 			}
 		}
 	}

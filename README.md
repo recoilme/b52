@@ -47,9 +47,7 @@ It use [evio](https://github.com/tidwall/evio) for network communications.
 
 [sniper](https://github.com/recoilme/sniper) - [fast](https://github.com/recoilme/sniper#performance), persistant on disk storage
 
-[ristretto](https://github.com/dgraph-io/ristretto) - [effective](https://github.com/dgraph-io/ristretto#features), inmemory LRU cache for "hot" values
-
-[freecache](https://github.com/coocood/freecache) - in memory, [with zero GC overhead](https://github.com/coocood/freecache#features) cache, for keys with TTL (time to live)
+[freecache](https://github.com/coocood/freecache) - in memory, [with zero GC overhead](https://github.com/coocood/freecache#features) cache, for keys with TTL (time to live) and LRU cache
 
 
 ### The balance between speed and efficiency is achieved as follows:

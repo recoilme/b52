@@ -20,7 +20,7 @@ var (
 	stdlib    = flag.Bool("stdlib", false, "use stdlib")
 	loops     = flag.Int("loops", 0, "num loops")
 	balance   = flag.String("balance", "random", "balance - random, round-robin or least-connections")
-	keepalive = flag.Int("keepalive", 0, "keepalive connection, in seconds")
+	keepalive = flag.Int("keepalive", 10, "keepalive connection, in seconds, default 10")
 	params    = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: sizelru=100&sizettl=100&dbdir=db")
 )
 
@@ -79,6 +79,7 @@ func main() {
 		//fmt.Printf("opened: %v\n", ec.RemoteAddr())
 		if (*keepalive) > 0 {
 			opts.TCPKeepAlive = time.Second * (time.Duration(*keepalive))
+			//fmt.Println("TCPKeepAlive:", opts.TCPKeepAlive)
 		}
 		//opts.ReuseInputBuffer = true // don't do it!
 		ec.SetContext(&conn{})

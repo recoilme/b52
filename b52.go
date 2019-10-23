@@ -10,15 +10,14 @@ import (
 	"runtime/debug"
 	"strconv"
 
-	"github.com/dgraph-io/ristretto"
-
 	"github.com/coocood/freecache"
+	"github.com/golang/snappy"
 	"github.com/recoilme/sniper"
 )
 
 type b52 struct {
 	ssd   *sniper.Store
-	lru   *ristretto.Cache
+	lru   *freecache.Cache
 	ttl   *freecache.Cache
 	slave net.Conn
 }
@@ -32,6 +31,7 @@ type McEngine interface {
 	Decr(key []byte, value uint64) (result uint64, err error)
 	Delete(key []byte) (isFound bool, err error)
 	Close() error
+	Count() uint64
 }
 
 // Newb52 - init database with params
@@ -87,15 +87,7 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 		db.ssd = ssd
 	}
 
-	lru, err := ristretto.NewCache(&ristretto.Config{
-		MaxCost:     int64(lrusize),
-		NumCounters: int64(lrusize) * 10,
-		BufferItems: 64,
-	})
-	if err != nil {
-		return nil, err
-	}
-	db.lru = lru
+	db.lru = freecache.NewCache(lrusize)
 
 	db.ttl = freecache.NewCache(ttlsize)
 	debug.SetGCPercent(20)
@@ -114,15 +106,18 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 
 // Get return value from lru or ttl cache or from disk storage
 func (db *b52) Get(key []byte) (value []byte, err error) {
-	if val, ok := db.lru.Get(key); ok {
-		return val.([]byte), nil
+	if val, err := db.lru.Get(key); err == nil {
+		return snappy.Decode(nil, val)
 	}
 	if value, err := db.ttl.Get(key); err == nil {
-		return value, nil
+		return snappy.Decode(nil, value)
 	}
 	err = nil // clear key not found err
 	if db.ssd != nil {
 		value, err = db.ssd.Get(key)
+		if err == nil {
+			value, err = snappy.Decode(nil, value)
+		}
 	}
 	return
 }
@@ -132,17 +127,23 @@ func (db *b52) Gets(keys [][]byte) (resp []byte, err error) {
 	buf := bytes.NewBuffer([]byte{})
 	w := bufio.NewWriter(buf)
 	for _, key := range keys {
-		if val, ok := db.lru.Get(key); ok {
-			fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(val.([]byte)), val.([]byte))
+		if val, err := db.lru.Get(key); err == nil {
+			if val, errsn := snappy.Decode(nil, val); errsn == nil {
+				fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(val), val)
+			}
 			continue
 		}
 		if value, errttl := db.ttl.Get(key); errttl == nil {
-			fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+			if value, errsn := snappy.Decode(nil, value); errsn == nil {
+				fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+			}
 			continue
 		}
 		if db.ssd != nil {
 			if value, errssd := db.ssd.Get(key); errssd == nil {
-				fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+				if value, errsn := snappy.Decode(nil, value); errsn == nil {
+					fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
+				}
 			}
 		}
 	}
@@ -156,6 +157,7 @@ func (db *b52) Gets(keys [][]byte) (resp []byte, err error) {
 // Persistent k/v - stored on disk
 func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply bool) (err error) {
 	//println("set", string(key), string(value))
+	value = snappy.Encode(nil, value)
 	if exp > 0 {
 		err = db.ttl.Set(key, value, int(exp))
 		return
@@ -164,19 +166,17 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 	if db.ssd != nil {
 		err = db.ssd.Set(key, value) // store on disk
 		// update on lru if any
-		//if _, ok := db.lru.Get(key); ok {
-		// if in LRU cache - update
-		if err == nil { //slow set prefer then slow get?
-			//db.lru.Set(key, value, 0)
+		if err != nil {
+			return
 		}
-		//}
+		db.lru.Set(key, value, 10)
+
 		if db.slave != nil && flags != 42 && err == nil {
 			//looks stupid
 			buf := bytes.NewBuffer([]byte{})
-			w := bufio.NewWriter(buf)
-
-			fmt.Fprintf(w, "set %s 42 0 %d\r\n%s\r\n", key, len(value), value)
-			w.Flush()
+			//w := bufio.NewWriter(buf)
+			fmt.Fprintf(buf, "set %s 42 0 %d\r\n%s\r\n", key, len(value), value)
+			//w.Flush()
 			n, e := db.slave.Write(buf.Bytes())
 			//e := db.slave.Set(&memcache.Item{Key: string(key), Value: value, Flags: 42, Expiration: exp})
 			if e != nil {
@@ -232,4 +232,11 @@ func (db *b52) Close() (err error) {
 	}
 
 	return
+}
+
+func (db *b52) Count() uint64 {
+	if db.ssd != nil {
+		return uint64(db.ssd.Count())
+	}
+	return 0
 }

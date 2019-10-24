@@ -7,24 +7,25 @@ import (
 )
 
 var (
-	cmdSet     = []byte("set")
-	cmdSetB    = []byte("SET")
-	cmdGet     = []byte("get")
-	cmdGetB    = []byte("GET")
-	cmdGets    = []byte("gets")
-	cmdGetsB   = []byte("GETS")
-	cmdClose   = []byte("close")
-	cmdCloseB  = []byte("CLOSE")
-	cmdDelete  = []byte("delete")
-	cmdDeleteB = []byte("DELETE")
-	cmdIncr    = []byte("incr")
-	cmdIncrB   = []byte("INCR")
-	cmdDecr    = []byte("decr")
-	cmdDecrB   = []byte("DECR")
-	cmdStats   = []byte("stats")
-	cmdQuit    = []byte("quit")
-	cmdQuitB   = []byte("QUIT")
-	cmdVersion = []byte("version") //"VERSION <version>\r\n", where <version> is the version string for theserver
+	cmdSet       = []byte("set")
+	cmdSetB      = []byte("SET")
+	cmdGet       = []byte("get")
+	cmdGetB      = []byte("GET")
+	cmdGets      = []byte("gets")
+	cmdGetsB     = []byte("GETS")
+	cmdClose     = []byte("close")
+	cmdCloseB    = []byte("CLOSE")
+	cmdDelete    = []byte("delete")
+	cmdDeleteB   = []byte("DELETE")
+	cmdIncr      = []byte("incr")
+	cmdIncrB     = []byte("INCR")
+	cmdDecr      = []byte("decr")
+	cmdDecrB     = []byte("DECR")
+	cmdStats     = []byte("stats")
+	cmdQuit      = []byte("quit")
+	cmdQuitB     = []byte("QUIT")
+	cmdVersion   = []byte("version")
+	cmdVerbosity = []byte("verbosity")
 
 	crlf     = []byte("\r\n")
 	space    = []byte(" ")
@@ -147,6 +148,8 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			return b[i+1:], []byte("VERSION " + version + "\r\n"), nil
 		case bytes.HasPrefix(line, cmdDecr), bytes.HasPrefix(line, cmdDecrB):
 			return b[i+1:], resultError, nil
+		case bytes.HasPrefix(line, cmdVerbosity):
+			return b[i+1:], resultOK, nil
 		}
 		return b[i+1:], nil, nil
 	}

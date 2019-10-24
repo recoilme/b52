@@ -22,6 +22,9 @@ var (
 	cmdDecr    = []byte("decr")
 	cmdDecrB   = []byte("DECR")
 	cmdStats   = []byte("stats")
+	cmdQuit    = []byte("quit")
+	cmdQuitB   = []byte("QUIT")
+	cmdVersion = []byte("version") //"VERSION <version>\r\n", where <version> is the version string for theserver
 
 	crlf     = []byte("\r\n")
 	space    = []byte(" ")
@@ -59,7 +62,7 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 		switch {
 		default:
 			//fmt.Println(string(line))
-		case bytes.HasPrefix(line, cmdClose), bytes.HasPrefix(line, cmdCloseB):
+		case bytes.HasPrefix(line, cmdClose), bytes.HasPrefix(line, cmdCloseB), bytes.HasPrefix(line, cmdQuit), bytes.HasPrefix(line, cmdQuitB):
 			//close
 			//fmt.Println("close")
 			return b, nil, ErrClose
@@ -140,6 +143,8 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			//}
 		case bytes.HasPrefix(line, cmdIncr), bytes.HasPrefix(line, cmdIncrB):
 			return b[i+1:], resultError, nil
+		case bytes.HasPrefix(line, cmdVersion):
+			return b[i+1:], []byte("VERSION " + version + "\r\n"), nil
 		case bytes.HasPrefix(line, cmdDecr), bytes.HasPrefix(line, cmdDecrB):
 			return b[i+1:], resultError, nil
 		}

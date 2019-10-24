@@ -271,7 +271,14 @@ func (db *b52) Stats() (resp []byte, err error) {
 	currItems := fmt.Sprintf("curr_items %d\r\n", db.Count())
 	cmdGet := fmt.Sprintf("cmd_get %d\r\n", atomic.LoadUint64(&db.cmdGet))
 	cmdSet := fmt.Sprintf("cmd_set %d\r\n", atomic.LoadUint64(&db.cmdSet))
+	fs := int64(0)
+	if db.ssd != nil {
+		fs, _ = db.ssd.FileSize()
+	}
+
+	cmdFs := fmt.Sprintf("file_size %d\r\n", fs)
 	buf := bytes.NewBuffer([]byte{})
+
 	w := bufio.NewWriter(buf)
 	fmt.Fprintf(w, "expvar {")
 	first := true
@@ -285,5 +292,5 @@ func (db *b52) Stats() (resp []byte, err error) {
 	fmt.Fprintf(w, "}\r\n")
 	w.Flush()
 
-	return []byte(ver + sys + total + currItems + cmdGet + cmdSet + string(buf.Bytes()) + "END\r\n"), nil
+	return []byte(ver + sys + total + currItems + cmdGet + cmdSet + cmdFs + string(buf.Bytes()) + "END\r\n"), nil
 }

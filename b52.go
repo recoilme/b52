@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"expvar"
 	"fmt"
 	"log"
 	"net"
@@ -265,10 +266,24 @@ func (db *b52) Stats() (resp []byte, err error) {
 	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
-	bytes := fmt.Sprintf("bytes %d\r\n", ms.Sys)
+	sys := fmt.Sprintf("bytes %d\r\n", ms.Sys)
 	total := fmt.Sprintf("heap_sys_mb %d\r\n", ms.HeapSys/1024/1024)
 	currItems := fmt.Sprintf("curr_items %d\r\n", db.Count())
 	cmdGet := fmt.Sprintf("cmd_get %d\r\n", atomic.LoadUint64(&db.cmdGet))
 	cmdSet := fmt.Sprintf("cmd_set %d\r\n", atomic.LoadUint64(&db.cmdSet))
-	return []byte(ver + bytes + total + currItems + cmdGet + cmdSet + "END\r\n"), nil
+	buf := bytes.NewBuffer([]byte{})
+	w := bufio.NewWriter(buf)
+	fmt.Fprintf(w, "expvar {")
+	first := true
+	expvar.Do(func(kv expvar.KeyValue) {
+		if !first {
+			fmt.Fprintf(w, ",")
+		}
+		first = false
+		fmt.Fprintf(w, "%q: %s", kv.Key, kv.Value)
+	})
+	fmt.Fprintf(w, "}\r\n")
+	w.Flush()
+
+	return []byte(ver + sys + total + currItems + cmdGet + cmdSet + string(buf.Bytes()) + "END\r\n"), nil
 }

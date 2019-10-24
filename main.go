@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	_ "expvar"
+
 	"github.com/tidwall/evio"
 )
 

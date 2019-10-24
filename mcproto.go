@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"runtime"
 )
 
 var (
@@ -122,13 +121,8 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			return b[i+1:], response, err
 
 		case bytes.HasPrefix(line, cmdStats):
-			ver := "STAT version " + version + "\r\n"
-			var ms runtime.MemStats
-			runtime.ReadMemStats(&ms)
-			bytes := fmt.Sprintf("bytes %d\r\n", ms.Alloc)
-			total := fmt.Sprintf("totalMb %d\r\n", ms.TotalAlloc/1024/1024)
-			currItems := fmt.Sprintf("curr_items %d\r\n", db.Count())
-			return b[i+1:], []byte(ver + bytes + total + currItems + "END\r\n"), nil
+			res, err := db.Stats()
+			return b[i+1:], res, err
 		case bytes.HasPrefix(line, cmdDelete), bytes.HasPrefix(line, cmdDeleteB):
 			key, noreply, err := scanDeleteLine(line, bytes.HasPrefix(line, cmdDeleteB))
 			if err != nil {

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 )
 
 var (
-	version   = "0.1.0"
+	version   = "0.1.1"
 	port      = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
 	slaveadr  = flag.String("slave", "", "Slave address, optional, example slave=127.0.0.1:11212")
 	unixs     = flag.String("unixs", "", "unix socket")
@@ -33,6 +34,11 @@ func main() {
 	flag.Parse()
 
 	var b52 McEngine
+	var totalConnections uint32 // Total number of connections opened since the server started running
+	var currConnections int32   // Number of open connections
+	atomic.StoreUint32(&totalConnections, 0)
+	atomic.StoreInt32(&currConnections, 0)
+
 	b52, err := Newb52(*params, *slaveadr)
 	if err != nil {
 		log.Fatalf("failed to create Newb52 database: %s", err.Error())
@@ -55,6 +61,7 @@ func main() {
 		if err != nil {
 			fmt.Println("Close", err.Error())
 		}
+		fmt.Printf("TotalConnections:%d, CurrentConnections:%d\r\n", atomic.LoadUint32(&totalConnections), atomic.LoadInt32(&currConnections))
 		os.Exit(1)
 	}()
 
@@ -76,6 +83,8 @@ func main() {
 		return
 	}
 	events.Opened = func(ec evio.Conn) (out []byte, opts evio.Options, action evio.Action) {
+		atomic.AddUint32(&totalConnections, 1)
+		atomic.AddInt32(&currConnections, 1)
 		//fmt.Printf("opened: %v\n", ec.RemoteAddr())
 		if (*keepalive) > 0 {
 			opts.TCPKeepAlive = time.Second * (time.Duration(*keepalive))
@@ -87,6 +96,7 @@ func main() {
 	}
 	events.Closed = func(ec evio.Conn, err error) (action evio.Action) {
 		//fmt.Printf("closed: %v\n", ec.RemoteAddr())
+		atomic.AddInt32(&currConnections, -1)
 		return
 	}
 

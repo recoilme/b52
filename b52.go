@@ -19,12 +19,13 @@ import (
 )
 
 type b52 struct {
-	ssd    *sniper.Store
-	lru    *freecache.Cache
-	ttl    *freecache.Cache
-	slave  net.Conn
-	cmdGet uint64 // Cumulative number of retrieval reqs
-	cmdSet uint64 // Cumulative number of storage reqs
+	ssd       *sniper.Store
+	lru       *freecache.Cache
+	ttl       *freecache.Cache
+	slave     net.Conn
+	slaveAddr string
+	cmdGet    uint64 // Cumulative number of retrieval reqs
+	cmdSet    uint64 // Cumulative number of storage reqs
 	/*
 	   | get_hits              | 64u     | Number of keys that have been requested   |
 	   |                       |         | and found present                         |
@@ -107,12 +108,14 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	debug.SetGCPercent(20)
 
 	if slave != "" {
-
-		c, err := net.Dial("tcp", slave)
+		db.slaveAddr = slave
+		c, err := net.Dial("udp", slave)
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			db.slave = nil
+		} else {
+			db.slave = c
 		}
-		db.slave = c
 	}
 
 	atomic.StoreUint64(&db.cmdGet, 0)
@@ -177,7 +180,10 @@ func (db *b52) Gets(keys [][]byte) (resp []byte, err error) {
 func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply bool) (err error) {
 	//println("set", string(key), string(value))
 	atomic.AddUint64(&db.cmdSet, 1)
-	value = snappy.Encode(nil, value)
+	if flags != 42 { //get from replication, allready encoded
+		value = snappy.Encode(nil, value)
+	}
+
 	if exp > 0 {
 		err = db.ttl.Set(key, value, int(exp))
 		return
@@ -191,16 +197,20 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 		}
 		db.lru.Set(key, value, 10)
 
+		if db.slaveAddr != "" && db.slave == nil {
+			//dial to slave
+			c, errSlave := net.Dial("udp", db.slaveAddr)
+			if errSlave != nil {
+				fmt.Println(errSlave)
+				return
+			}
+			db.slave = c
+		}
 		if db.slave != nil && flags != 42 && err == nil {
-			//looks stupid
-			buf := bytes.NewBuffer([]byte{})
-			//w := bufio.NewWriter(buf)
-			fmt.Fprintf(buf, "set %s 42 0 %d\r\n%s\r\n", key, len(value), value)
-			//w.Flush()
-			n, e := db.slave.Write(buf.Bytes())
-			//e := db.slave.Set(&memcache.Item{Key: string(key), Value: value, Flags: 42, Expiration: exp})
+			n, e := fmt.Fprintf(db.slave, "set %s 42 0 %d\r\n%s\r\n", key, len(value), value)
 			if e != nil {
 				fmt.Println("slave err", e.Error(), n)
+				db.slave = nil
 			}
 		}
 		return
@@ -231,15 +241,10 @@ func (db *b52) Delete(key []byte) (isFound bool, err error) {
 		isFound, err = db.ssd.Delete(key)
 
 		if db.slave != nil && isFound && err == nil {
-			//looks stupid
-			buf := bytes.NewBuffer([]byte{})
-			w := bufio.NewWriter(buf)
-
-			fmt.Fprintf(w, "delete %s\r\n", key)
-			w.Flush()
-			n, e := db.slave.Write(buf.Bytes())
+			n, e := fmt.Fprintf(db.slave, "delete %s\r\n", key)
 			if e != nil {
 				fmt.Println("slave err", e.Error(), n)
+				db.slave = nil
 			}
 		}
 	}
@@ -249,6 +254,9 @@ func (db *b52) Delete(key []byte) (isFound bool, err error) {
 func (db *b52) Close() (err error) {
 	if db.ssd != nil {
 		err = db.ssd.Close()
+	}
+	if db.slave != nil {
+		db.slave.Close()
 	}
 
 	return

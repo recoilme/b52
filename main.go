@@ -16,14 +16,15 @@ import (
 )
 
 var (
-	version   = "0.1.1"
+	version   = "0.1.3"
 	port      = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
 	slaveadr  = flag.String("slave", "", "Slave address, optional, example slave=127.0.0.1:11212")
 	unixs     = flag.String("unixs", "", "unix socket")
 	stdlib    = flag.Bool("stdlib", false, "use stdlib")
-	loops     = flag.Int("loops", 0, "num loops")
+	noudp     = flag.Bool("noudp", false, "disable udp interface")
+	loops     = flag.Int("loops", -1, "num loops")
 	balance   = flag.String("balance", "random", "balance - random, round-robin or least-connections")
-	keepalive = flag.Int("keepalive", 10, "keepalive connection, in seconds, default 10")
+	keepalive = flag.Int("keepalive", 10, "keepalive connection, in seconds")
 	params    = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: sizelru=100&sizettl=100&dbdir=db")
 )
 
@@ -56,8 +57,8 @@ func main() {
 		q := <-quit
 		fmt.Printf("\nRECEIVED SIGNAL: %s\n", q)
 		//ignore broken pipe?
-		if q == syscall.SIGPIPE || q.String() == "broken pipe" {
-			//return
+		if q == syscall.SIGPIPE || q.String() == "broken pipe" || q.String() == "window size changes" {
+			return
 		}
 		err = b52.Close()
 		if err != nil {
@@ -107,8 +108,15 @@ func main() {
 			fmt.Printf("wake from %s\n", ec.RemoteAddr())
 			return nil, evio.Close
 		}
-		c := ec.Context().(*conn)
-		data := c.is.Begin(in)
+		//println(string(in))
+		var data []byte
+		var c *conn
+		if ec.Context() == nil {
+			data = in
+		} else {
+			c = ec.Context().(*conn)
+			data = c.is.Begin(in)
+		}
 		responses := make([]byte, 0)
 		for {
 			leftover, response, err := mcproto(data, b52)
@@ -131,7 +139,10 @@ func main() {
 		}
 		//println("handle the responses", string(responses))
 		out = responses
-		c.is.End(data)
+		if c != nil {
+			c.is.End(data)
+		}
+
 		return
 	}
 	var ssuf string
@@ -141,6 +152,9 @@ func main() {
 	addrs := []string{fmt.Sprintf("tcp"+ssuf+"://:%d", *port)} //?reuseport=true
 	if *unixs != "" {
 		addrs = append(addrs, fmt.Sprintf("unix"+ssuf+"://%s", *unixs))
+	}
+	if !*noudp {
+		addrs = append(addrs, fmt.Sprintf("udp"+ssuf+"://:%d", *port))
 	}
 	err = evio.Serve(events, addrs...)
 	if err != nil {

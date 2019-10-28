@@ -28,12 +28,47 @@ func Test_Snappy(t *testing.T) {
 	println(len(s), len(gs))
 }
 
+func Test_Udp(t *testing.T) {
+	addr := ":11211"
+	//udp
+	/*
+		udpAddr, err := net.ResolveUDPAddr("udp", addr)
+		if err != nil {
+			panic(err)
+		}
+		//localUdp, err := net.ResolveUDPAddr("udp", ":0")
+		//if err != nil {
+		//panic(err)
+		//}
+		udpConn, err := net.DialUDP("udp", nil, udpAddr)
+		if err != nil {
+			panic(err)
+		}
+		defer udpConn.Close()
+		buf := []byte("set e 0 0 1\r\n1\r\nset f 0 0 1\r\n2\r\n")
+		_, err = udpConn.Write(buf)
+		if err != nil {
+			panic(err)
+		}*/
+	conn, err := net.Dial("udp", addr)
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+
+	// Call the `Write()` method of the implementor
+	// of the `io.Writer` interface.
+	_, err = fmt.Fprintf(conn, "set e 0 0 1\r\n1\r\nset f 0 0 1\r\n2\r\n")
+	if err != nil {
+		panic(err)
+	}
+}
+
 //go test -race -run=Base
 func Test_Base(t *testing.T) {
 	go main()
 	time.Sleep(10 * time.Second)
 	addr := ":11211"
-
 	//pipeline
 
 	c, err := net.Dial("tcp", addr)
@@ -60,9 +95,11 @@ func Test_Base(t *testing.T) {
 		println(n, len(p))
 		panic("err pipelining")
 	}
-
+	Test_Udp(t)
 	// 2 clients
 	mc := memcache.New(addr)
+	multisize := 10000
+	mc.Timeout = 1000 * time.Millisecond
 	mc.Set(&memcache.Item{Key: string("key"), Value: []byte("value"), Flags: 1, Expiration: 0})
 	v, err := mc.Get("key")
 	if err != nil {
@@ -82,9 +119,18 @@ func Test_Base(t *testing.T) {
 		t.Error("not value")
 	}
 
+	items, err := mc.GetMulti([]string{"c", "d", "e", "f"})
+	if err != nil {
+		panic(err)
+	}
+	for _, it := range items {
+		_ = it
+		//println(it.Key, string(it.Value))
+	}
+
 	//multi set from clients
-	println("multi set from clients")
-	multisize := 10000
+	//println("multi set from clients")
+
 	for i := 0; i <= multisize; i++ {
 		s := fmt.Sprintf("%d", i)
 		item := &memcache.Item{Key: s, Value: []byte(s), Flags: 0, Expiration: 0}
@@ -125,7 +171,7 @@ func Test_Base(t *testing.T) {
 	}
 
 	t2 := time.Now()
-	items, err := mc.GetMulti(multi)
+	items, err = mc.GetMulti(multi)
 	t3 := time.Now()
 	if t3.Sub(t2) > (1 * time.Millisecond) {
 		println("multiget is slow:", t3.Sub(t2).Milliseconds())
@@ -173,8 +219,6 @@ func Test_Base(t *testing.T) {
 		if item.Key == "exists" {
 			if string(item.Value) != "exists2" {
 				t.Error("no exists2")
-			} else {
-				println("ok exists2")
 			}
 		}
 	}

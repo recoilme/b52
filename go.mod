@@ -9,7 +9,7 @@ require (
 	github.com/golang/snappy v0.0.1
 	github.com/kavu/go_reuseport v1.4.0 // indirect
 
-	github.com/recoilme/sniper v0.1.1
+	github.com/recoilme/sniper v0.1.2
 	github.com/tidwall/evio v1.0.2
 
 	github.com/tidwall/lotsa v0.0.0-20190911211615-e96c7fea75f1

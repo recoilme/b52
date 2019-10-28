@@ -207,11 +207,11 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 			db.slave = c
 		}
 		if db.slave != nil && flags != 42 && err == nil {
-			n, e := fmt.Fprintf(db.slave, "set %s 42 0 %d\r\n%s\r\n", key, len(value), value)
-			if e != nil {
-				fmt.Println("slave err", e.Error(), n)
-				db.slave = nil
-			}
+			go fmt.Fprintf(db.slave, "set %s 42 0 %d\r\n%s\r\n", key, len(value), value)
+			//if e != nil {
+			//fmt.Println("slave err", e.Error(), n)
+			//db.slave = nil
+			//}
 		}
 		return
 	}

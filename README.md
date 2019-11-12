@@ -58,7 +58,7 @@ New entries go to disk (sniper). As you access them, they are cached in the LRU-
 
 For minimizing GC and allocations overhead - Sniper stored keys, and value addres/size in plain hash (map[uint32]uint32). HashMaps are fast, but has a memory cost. You must have 2Gb+ memory for storing every 100_000_000 entrys.
 
-In Freecache and Ristretto memory is preallocated and it's size depends from you. 
+In Freecache memory is preallocated and it's size depends from you. 
 
 ## Disk usage
 

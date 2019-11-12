@@ -83,7 +83,7 @@ close
 [mc-benchmark](https://github.com/antirez/mc-benchmark)
 ```
 
-Database params (running as master/slave, 1k-3k active connections, 100Gb lru cache,100 Mb ttl cache):
+Database params (running as master/slave, 1Gb lru cache, 100 Mb ttl cache, stats after 3 days using):
 stats
 STAT version 0.1.3
 bytes 1814112504
@@ -93,7 +93,7 @@ cmd_get 427387002
 cmd_set 415174979
 file_size 3774895840
 
-test:
+test (on production, with 1-3k active connections at same time):
 
 ./b52 -p 11222 -loops 10
 sizelru: 100 Mb

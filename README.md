@@ -123,9 +123,6 @@ b52 server started on port 11222 (loops: 10)
 60.25% <= 0 milliseconds
 100.00% <= 1 milliseconds
 123629.63 requests per second
-
-
-Or grab compiled binary version.
 ```
 
 

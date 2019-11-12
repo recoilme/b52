@@ -93,14 +93,7 @@ cmd_get 427387002
 cmd_set 415174979
 file_size 3774895840
 
-test (on production, with 1-3k active connections at same time):
-
-./b52 -p 11222 -loops 10
-sizelru: 100 Mb
-sizettl: 100 Mb
-dbdir: db
-b52 server started on port 11222 (loops: 10)
-
+test (on production, with ~2k active connections at same time):
 ./mc-benchmark -p 11222
 
 ====== SET ======

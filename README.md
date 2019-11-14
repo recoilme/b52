@@ -78,6 +78,24 @@ END
 close
 ```
 
+## Memcache protocol
+
+b52 use text version of [memcache protocol](https://github.com/memcached/memcached/blob/master/doc/protocol.txt). With this commands:
+```
+	cmdAdd       = []byte("add")
+	cmdReplace   = []byte("replace")
+	cmdSet       = []byte("set")
+	cmdGet       = []byte("get")
+	cmdGets      = []byte("gets")
+	cmdClose     = []byte("close")
+	cmdDelete    = []byte("delete")
+	cmdIncr      = []byte("incr")
+	cmdDecr      = []byte("decr")
+	cmdStats     = []byte("stats")
+	cmdQuit      = []byte("quit")
+	cmdVersion   = []byte("version")
+```
+
 ## mc-benchmark
 
 [mc-benchmark](https://github.com/antirez/mc-benchmark)

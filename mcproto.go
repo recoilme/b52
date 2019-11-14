@@ -4,23 +4,20 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var (
+	cmdAdd       = []byte("add")
+	cmdReplace   = []byte("replace")
 	cmdSet       = []byte("set")
-	cmdSetB      = []byte("SET")
 	cmdGet       = []byte("get")
-	cmdGetB      = []byte("GET")
 	cmdGets      = []byte("gets")
-	cmdGetsB     = []byte("GETS")
 	cmdClose     = []byte("close")
 	cmdCloseB    = []byte("CLOSE")
 	cmdDelete    = []byte("delete")
-	cmdDeleteB   = []byte("DELETE")
 	cmdIncr      = []byte("incr")
-	cmdIncrB     = []byte("INCR")
 	cmdDecr      = []byte("decr")
-	cmdDecrB     = []byte("DECR")
 	cmdStats     = []byte("stats")
 	cmdQuit      = []byte("quit")
 	cmdQuitB     = []byte("QUIT")
@@ -67,8 +64,60 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			//close
 			//fmt.Println("close")
 			return b, nil, ErrClose
-		case bytes.HasPrefix(line, cmdSet), bytes.HasPrefix(line, cmdSetB):
-			key, flags, exp, size, noreply, err := scanSetLine(line, bytes.HasPrefix(line, cmdSetB))
+		case bytes.HasPrefix(line, cmdAdd):
+			//  "add" means "store this data, but only if the server *doesn't* already
+			key, flags, exp, size, noreply, err := scanSetLine(line, string(cmdAdd))
+			if err != nil {
+				return b, nil, err
+			}
+			mustlen := i + 1 + size + 2 // pos(\n)+size+\r\n
+			if len(b) < mustlen {
+				//incomplete cmd, wait for all data
+				return b, nil, nil
+			}
+			_, err = db.Get([]byte(key))
+			if err != nil {
+				if !strings.Contains(err.Error(), "not found") {
+					return b[mustlen:], resultNotStored, err
+				}
+			} else {
+				//has this key
+				return b[mustlen:], resultNotStored, err
+			}
+			err = db.Set([]byte(key), b[i+1:i+1+size], flags, exp, size, noreply)
+			if noreply {
+				return b[mustlen:], nil, err
+			}
+			if err != nil {
+				return b[mustlen:], resultNotStored, err
+			}
+			return b[mustlen:], resultStored, err
+		case bytes.HasPrefix(line, cmdReplace):
+			//  "replace" means "store this data, but only if the server *does*
+			key, flags, exp, size, noreply, err := scanSetLine(line, string(cmdReplace))
+			if err != nil {
+				return b, nil, err
+			}
+			mustlen := i + 1 + size + 2 // pos(\n)+size+\r\n
+			if len(b) < mustlen {
+				//incomplete cmd, wait for all data
+				return b, nil, nil
+			}
+			_, err = db.Get([]byte(key))
+			if err != nil {
+				return b[mustlen:], resultNotStored, nil
+			}
+			err = db.Set([]byte(key), b[i+1:i+1+size], flags, exp, size, noreply)
+			if noreply {
+				return b[mustlen:], nil, err
+			}
+			if err != nil {
+				return b[mustlen:], resultNotStored, err
+			}
+			return b[mustlen:], resultStored, err
+		case bytes.HasPrefix(line, cmdSet):
+
+			key, flags, exp, size, noreply, err := scanSetLine(line, string(cmdSet))
 			if err != nil {
 				return b, nil, err
 			}
@@ -79,11 +128,6 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 				//fmt.Println("incomplete set", len(b), mustlen)
 				return b, nil, nil
 			}
-			//if size > 1000 {
-			//fmt.Println("set big:", (key), "'"+string(b[i+1:i+1+size])+"'", size, len(b[i+1:i+1+size]))
-			//return b[mustlen:], resultNotStored, nil
-			//}
-
 			err = db.Set([]byte(key), b[i+1:i+1+size], flags, exp, size, noreply)
 			//println("set", string(key), size, string(b[i+1:i+1+size]), len(string(b[i+1:i+1+size])), err)
 			if noreply {
@@ -95,7 +139,7 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 				return b[mustlen:], resultNotStored, err
 			}
 			return b[mustlen:], resultStored, err
-		case bytes.HasPrefix(line, cmdGet), bytes.HasPrefix(line, cmdGetB), bytes.HasPrefix(line, cmdGets), bytes.HasPrefix(line, cmdGetsB):
+		case bytes.HasPrefix(line, cmdGet), bytes.HasPrefix(line, cmdGets):
 			//fmt.Println("get")
 			cntspace := bytes.Count(line, space)
 			if cntspace == 0 {
@@ -127,8 +171,8 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 		case bytes.HasPrefix(line, cmdStats):
 			res, err := db.Stats()
 			return b[i+1:], res, err
-		case bytes.HasPrefix(line, cmdDelete), bytes.HasPrefix(line, cmdDeleteB):
-			key, noreply, err := scanDeleteLine(line, bytes.HasPrefix(line, cmdDeleteB))
+		case bytes.HasPrefix(line, cmdDelete):
+			key, noreply, err := scanDeleteLine(line)
 			if err != nil {
 				return b, nil, err
 			}
@@ -142,11 +186,11 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			return b[i+1:], resultNotFound, nil
 
 			//}
-		case bytes.HasPrefix(line, cmdIncr), bytes.HasPrefix(line, cmdIncrB):
+		case bytes.HasPrefix(line, cmdIncr):
 			return b[i+1:], resultError, nil
 		case bytes.HasPrefix(line, cmdVersion):
 			return b[i+1:], []byte("VERSION " + version + "\r\n"), nil
-		case bytes.HasPrefix(line, cmdDecr), bytes.HasPrefix(line, cmdDecrB):
+		case bytes.HasPrefix(line, cmdDecr):
 			return b[i+1:], resultError, nil
 		case bytes.HasPrefix(line, cmdVerbosity):
 			return b[i+1:], resultOK, nil
@@ -159,14 +203,17 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 
 // scanSetLine populates it and returns the declared params of the item.
 // It does not read the bytes of the item.
-func scanSetLine(line []byte, isCap bool) (key string, flags uint32, exp int32, size int, noreply bool, err error) {
+//<command name> <key> <flags> <exptime> <bytes> [noreply]\r\n
+//- <command name> is "set", "add", "replace"
+//  "set" means "store this data"
+//  "add" means "store this data, but only if the server *doesn't* already
+//  hold data for this key".
+//  "replace" means "store this data, but only if the server *does*
+//  already hold data for this key".
+func scanSetLine(line []byte, cmd string) (key string, flags uint32, exp int32, size int, noreply bool, err error) {
 	//set := ""
 	noreplys := ""
 	noreply = false
-	cmd := "set"
-	if isCap {
-		cmd = "SET"
-	}
 	pattern := cmd + " %s %d %d %d %s\r\n"
 	dest := []interface{}{&key, &flags, &exp, &size, &noreplys}
 
@@ -186,14 +233,12 @@ func scanSetLine(line []byte, isCap bool) (key string, flags uint32, exp int32, 
 
 // scanDeleteLine populates it and returns the declared params of the item.
 // It does not read the bytes of the item.
-func scanDeleteLine(line []byte, isCap bool) (key string, noreply bool, err error) {
+func scanDeleteLine(line []byte) (key string, noreply bool, err error) {
 	//set := ""
 	noreplys := ""
 	noreply = false
 	cmd := "delete"
-	if isCap {
-		cmd = "DELETE"
-	}
+
 	pattern := cmd + " %s %s\r\n"
 	dest := []interface{}{&key, &noreplys}
 	if bytes.Count(line, space) == 1 {

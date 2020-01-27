@@ -19,6 +19,8 @@ github.com/recoilme/sniper v0.1.1 h1:wfbLandgrTMWZNqZ+xDUiK4DDcuIAR5Pm5w/sLnAM9I
 github.com/recoilme/sniper v0.1.1/go.mod h1:8Q9MpI//VA5hQygl7oyRqym6B5vz/qZNGfF2a5BKNYI=
 github.com/recoilme/sniper v0.1.2 h1:o4GkWvRQL9R8p6aVxamX0S7xmSE0IOUVyEPt0OpBU0Y=
 github.com/recoilme/sniper v0.1.2/go.mod h1:8Q9MpI//VA5hQygl7oyRqym6B5vz/qZNGfF2a5BKNYI=
+github.com/recoilme/sniper v0.1.3 h1:DNo2ztOGwxzTaS4ezCL0TyOBjvkA9ApyyuPTGJuAhvw=
+github.com/recoilme/sniper v0.1.3/go.mod h1:0mC4P4fahSAuRi/eRk56GftHwVNK8MciuW6a0E5V4nA=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0bLI=
@@ -28,6 +30,8 @@ github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJy
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 github.com/tidwall/evio v1.0.2 h1:vhPp5nVS5PZfR0CfV5ixqDEf+BKQFcaR1W1XeLLkvRE=
 github.com/tidwall/evio v1.0.2/go.mod h1:cYtY49LddNrlpsOmW7qJnqM8B2gOjrFrzT8+Fnb/GKs=
+github.com/tidwall/evio v1.0.7 h1:vczkMaNN5Ekj0bsbT/3gCnLyOaKsecxrJFlbYFOsv0Y=
+github.com/tidwall/evio v1.0.7/go.mod h1:cYtY49LddNrlpsOmW7qJnqM8B2gOjrFrzT8+Fnb/GKs=
 github.com/tidwall/lotsa v0.0.0-20190911211615-e96c7fea75f1 h1:0UUWztiFKCvA2j2Pr0xnTIgoVibr824SSqqjstZtGx8=
 github.com/tidwall/lotsa v0.0.0-20190911211615-e96c7fea75f1/go.mod h1:X6NiU+4yHA3fE3Puvpnn1XMDrFZrE9JO2/w+UMuqgR8=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=

@@ -158,6 +158,64 @@ test (on production, with ~2k active connections at same time):
 99.99% <= 2 milliseconds
 100.00% <= 3 milliseconds
 101851.33 requests per second
+
+macbook pro,2019
+
+./mc-benchmark -c 200 -n 100000
+====== SET ======
+  100000 requests completed in 0.85 seconds
+  200 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+9.17% <= 0 milliseconds
+55.60% <= 1 milliseconds
+82.28% <= 2 milliseconds
+91.33% <= 3 milliseconds
+96.29% <= 4 milliseconds
+98.90% <= 5 milliseconds
+99.71% <= 6 milliseconds
+99.82% <= 7 milliseconds
+99.90% <= 8 milliseconds
+99.97% <= 9 milliseconds
+100.00% <= 10 milliseconds
+100.00% <= 11 milliseconds
+118063.76 requests per second
+
+====== GET ======
+  100042 requests completed in 0.71 seconds
+  200 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+60.14% <= 1 milliseconds
+99.50% <= 2 milliseconds
+99.99% <= 3 milliseconds
+100.00% <= 4 milliseconds
+141102.97 requests per second
+
+memcache results)
+====== SET ======
+  100015 requests completed in 0.67 seconds
+  200 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+67.39% <= 1 milliseconds
+99.88% <= 2 milliseconds
+100.00% <= 3 milliseconds
+148610.70 requests per second
+
+====== GET ======
+  100019 requests completed in 0.69 seconds
+  200 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+63.48% <= 1 milliseconds
+98.97% <= 2 milliseconds
+99.87% <= 3 milliseconds
+100.00% <= 4 milliseconds
 ```
 
 [expvar](https://gist.github.com/recoilme/0624cd5ecda195c804b67b1d64394603)

@@ -99,17 +99,17 @@ b52 use text version of [memcache protocol](https://github.com/memcached/memcach
 ## mc-benchmark
 
 [mc-benchmark](https://github.com/antirez/mc-benchmark)
-```
 
+```
 Database params (running as master/slave, 1Gb lru cache, 100 Mb ttl cache, stats after 3 days using):
 stats
 STAT version 0.1.3
-bytes 1814112504
-heap_sys_mb 1656
-curr_items 6074656
-cmd_get 427387002
-cmd_set 415174979
-file_size 3774895840
+bytes 2301825272
+heap_sys_mb 2103
+curr_items 17165174
+cmd_get 6660544669
+cmd_set 6494641380
+file_size 14172392544
 
 test (on production, with ~2k active connections at same time):
 ./mc-benchmark -p 11222
@@ -134,6 +134,30 @@ test (on production, with ~2k active connections at same time):
 60.25% <= 0 milliseconds
 100.00% <= 1 milliseconds
 123629.63 requests per second
+
+./mc-benchmark -n 100000 -p 11212
+====== SET ======
+  100003 requests completed in 1.03 seconds
+  50 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+49.59% <= 0 milliseconds
+99.16% <= 1 milliseconds
+100.00% <= 2 milliseconds
+96996.12 requests per second
+
+====== GET ======
+  100018 requests completed in 0.98 seconds
+  50 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+51.55% <= 0 milliseconds
+99.72% <= 1 milliseconds
+99.99% <= 2 milliseconds
+100.00% <= 3 milliseconds
+101851.33 requests per second
 ```
 
 [expvar](https://gist.github.com/recoilme/0624cd5ecda195c804b67b1d64394603)

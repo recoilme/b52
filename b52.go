@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"os"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -214,7 +215,14 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 				bin := db.accum.buf.Bytes()
 				db.accum.buf.Reset()
 				//fmt.Printf("Accum:2, buf:%s len:%d\n", string(bin), len(db.accum.buf.Bytes()))
+				hostname, errHN := os.Hostname()
+				if err != nil {
+					fmt.Println("Error, get hostname: ", errHN)
+				}
 				for _, slave := range slaves {
+					if strings.Contains(slave, hostname) {
+						continue
+					}
 					c, cErr := net.Dial("tcp", slave)
 					if cErr != nil {
 						fmt.Println("Error, connection:" + slave + cErr.Error())

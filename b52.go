@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/url"
 	"runtime"
 	"runtime/debug"
 	"strconv"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -18,14 +21,21 @@ import (
 	"github.com/recoilme/sniper"
 )
 
+type accumulator struct {
+	sync.RWMutex
+	buf         bytes.Buffer
+	accumulated int
+}
+
 type b52 struct {
-	ssd       *sniper.Store
-	lru       *freecache.Cache
-	ttl       *freecache.Cache
-	slave     net.Conn
+	ssd *sniper.Store
+	lru *freecache.Cache
+	ttl *freecache.Cache
+	//slave     net.Conn
 	slaveAddr string
 	cmdGet    uint64 // Cumulative number of retrieval reqs
 	cmdSet    uint64 // Cumulative number of storage reqs
+	accum     *accumulator
 	/*
 	   | get_hits              | 64u     | Number of keys that have been requested   |
 	   |                       |         | and found present                         |
@@ -84,14 +94,10 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	if len(p["dbdir"]) > 0 {
 		dbdir = p["dbdir"][0]
 	}
-	println("dbdir:", dbdir)
-
-	slave := ""
-	if len(slaveadr) > 0 {
-		slave = slaveadr
-	}
+	//println("dbdir:", dbdir)
 
 	db := &b52{}
+	db.slaveAddr = slaveadr
 	if dbdir == "" {
 		db.ssd = nil
 	} else {
@@ -107,19 +113,10 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	db.ttl = freecache.NewCache(ttlsize)
 	debug.SetGCPercent(20)
 
-	if slave != "" {
-		db.slaveAddr = slave
-		c, err := net.Dial("udp", slave)
-		if err != nil {
-			fmt.Println(err)
-			db.slave = nil
-		} else {
-			db.slave = c
-		}
-	}
-
 	atomic.StoreUint64(&db.cmdGet, 0)
 	atomic.StoreUint64(&db.cmdSet, 0)
+
+	db.accum = &accumulator{}
 
 	return db, nil
 }
@@ -197,7 +194,7 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 		}
 		db.lru.Set(key, value, 10)
 
-		if db.slaveAddr != "" && db.slave == nil {
+		/*if db.slaveAddr != "" && db.slave == nil {
 			//dial to slave
 			c, errSlave := net.Dial("udp", db.slaveAddr)
 			if errSlave != nil {
@@ -206,8 +203,37 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 			}
 			db.slave = c
 		}
-		if db.slave != nil && flags != 42 && err == nil {
-			go fmt.Fprintf(db.slave, "set %s 42 0 %d\r\n%s\r\n", key, len(value), value)
+		if db.slave != nil*/
+		//fmt.Println(db.accum.accumulated)
+		if db.slaveAddr != "" && flags != 42 && err == nil {
+			db.accum.Lock()
+			fmt.Fprintf(&db.accum.buf, "set %s 42 0 %d noreply\r\n%s\r\n", key, len(value), value)
+			db.accum.accumulated++
+			if db.accum.accumulated == 20 {
+				slaves := strings.Split(db.slaveAddr, ",")
+				bin := db.accum.buf.Bytes()
+				db.accum.buf.Reset()
+				//fmt.Printf("Accum:2, buf:%s len:%d\n", string(bin), len(db.accum.buf.Bytes()))
+				for _, slave := range slaves {
+					c, cErr := net.Dial("tcp", slave)
+					if cErr != nil {
+						fmt.Println("Error, connection:" + slave + cErr.Error())
+						break
+					}
+					writed, copyErr := io.Copy(c, bytes.NewBuffer(bin))
+					if writed != int64(len(bin)) || copyErr != nil {
+						fmt.Printf("Error, write 2 connection:%s writed:%d len:%d err:%v\n", slave, writed, len(bin), copyErr)
+					}
+					closeErr := c.Close()
+					if closeErr != nil {
+						fmt.Println("Error,close:" + closeErr.Error())
+					}
+				}
+				db.accum.accumulated = 0
+			}
+			db.accum.Unlock()
+
+			//go fmt.Fprintf(db.slave, "set %s 42 0 %d\r\n%s\r\n", key, len(value), value)
 			//if e != nil {
 			//fmt.Println("slave err", e.Error(), n)
 			//db.slave = nil
@@ -240,11 +266,22 @@ func (db *b52) Delete(key []byte) (isFound bool, err error) {
 	if db.ssd != nil {
 		isFound, err = db.ssd.Delete(key)
 
-		if db.slave != nil && isFound && err == nil {
-			n, e := fmt.Fprintf(db.slave, "delete %s\r\n", key)
-			if e != nil {
-				fmt.Println("slave err", e.Error(), n)
-				db.slave = nil
+		if db.slaveAddr != "" && isFound && err == nil {
+			slaves := strings.Split(db.slaveAddr, ",")
+			for _, slave := range slaves {
+				c, cErr := net.Dial("tcp", slave)
+				if cErr != nil {
+					fmt.Println("Error, connection:" + slave + cErr.Error())
+					break
+				}
+				n, e := fmt.Fprintf(c, "delete %s noreply\r\n", key)
+				if e != nil {
+					fmt.Println("slave err", e.Error(), n)
+				}
+				closeErr := c.Close()
+				if closeErr != nil {
+					fmt.Println("Error,close:" + closeErr.Error())
+				}
 			}
 		}
 	}
@@ -255,10 +292,6 @@ func (db *b52) Close() (err error) {
 	if db.ssd != nil {
 		err = db.ssd.Close()
 	}
-	if db.slave != nil {
-		db.slave.Close()
-	}
-
 	return
 }
 

@@ -99,8 +99,8 @@ b52 use text version of [memcache protocol](https://github.com/memcached/memcach
 ## mc-benchmark
 
 [mc-benchmark](https://github.com/antirez/mc-benchmark)
-```
 
+```
 Database params (running as master/slave, 1Gb lru cache, 100 Mb ttl cache, stats after 3 days using):
 stats
 STAT version 0.1.3

@@ -5,18 +5,17 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	_ "expvar"
 
+	"github.com/recoilme/graceful"
 	"github.com/tidwall/evio"
 )
 
 var (
-	version   = "0.1.4"
+	version   = "0.1.5"
 	port      = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
 	slaveadr  = flag.String("slave", "", "Slave address, optional, example slave=127.0.0.1:11212")
 	unixs     = flag.String("unixs", "", "unix socket")
@@ -26,6 +25,7 @@ var (
 	balance   = flag.String("balance", "random", "balance - random, round-robin or least-connections")
 	keepalive = flag.Int("keepalive", 10, "keepalive connection, in seconds")
 	params    = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: sizelru=100&sizettl=100&dbdir=db")
+	startTime = int64(0)
 )
 
 type conn struct {
@@ -34,6 +34,7 @@ type conn struct {
 }
 
 func main() {
+	startTime = time.Now().Unix()
 	flag.Parse()
 
 	var b52 McEngine
@@ -49,24 +50,17 @@ func main() {
 
 	// Wait for interrupt signal to gracefully shutdown the server with
 	// setup signal catching
+	// Wait for interrupt signal to gracefully shutdown the server with
 	quit := make(chan os.Signal, 1)
-	// catch all signals since not explicitly listing
-	signal.Notify(quit)
-	// method invoked upon seeing signal
-	go func() {
-		q := <-quit
-		fmt.Printf("\nRECEIVED SIGNAL: %s\n", q)
-		//ignore broken pipe?
-		if q == syscall.SIGPIPE || q.String() == "broken pipe" || q.String() == "window size changes" {
-			return
-		}
+	fallback := func() error {
+		fmt.Println("terminated server")
 		err = b52.Close()
 		if err != nil {
 			fmt.Println("Close", err.Error())
 		}
-		fmt.Printf("TotalConnections:%d, CurrentConnections:%d\r\n", atomic.LoadUint32(&totalConnections), atomic.LoadInt32(&currConnections))
-		os.Exit(1)
-	}()
+		return nil
+	}
+	graceful.Unignore(quit, fallback, graceful.Terminate...)
 
 	var events evio.Events
 	switch *balance {

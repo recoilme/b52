@@ -61,26 +61,6 @@ func main() {
 		return nil
 	}
 	graceful.Unignore(quit, fallback, graceful.Terminate...)
-	/*
-		quit := make(chan os.Signal, 1)
-		// catch all signals since not explicitly listing
-		signal.Notify(quit)
-		// method invoked upon seeing signal
-		go func() {
-			q := <-quit
-			fmt.Printf("\nRECEIVED SIGNAL: %s\n", q)
-			//ignore broken pipe?
-			if q == syscall.SIGPIPE || q.String() == "broken pipe" || q.String() == "window size changes" {
-				return
-			}
-			err = b52.Close()
-			if err != nil {
-				fmt.Println("Close", err.Error())
-			}
-			fmt.Printf("TotalConnections:%d, CurrentConnections:%d\r\n", atomic.LoadUint32(&totalConnections), atomic.LoadInt32(&currConnections))
-			os.Exit(1)
-		}()
-	*/
 
 	var events evio.Events
 	switch *balance {

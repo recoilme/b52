@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"expvar"
 	"fmt"
 	"log"
 	"net"
@@ -12,6 +11,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"sync/atomic"
+	"time"
 
 	"github.com/coocood/freecache"
 	"github.com/golang/snappy"
@@ -271,34 +271,36 @@ func (db *b52) Count() uint64 {
 
 func (db *b52) Stats() (resp []byte, err error) {
 	ver := "STAT version " + version + "\r\n"
+	uptime := fmt.Sprintf("STAT uptime %d\r\n", uint32(time.Now().Unix()-startTime))
 	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
-	sys := fmt.Sprintf("bytes %d\r\n", ms.Sys)
-	total := fmt.Sprintf("heap_sys_mb %d\r\n", ms.HeapSys/1024/1024)
-	currItems := fmt.Sprintf("curr_items %d\r\n", db.Count())
-	cmdGet := fmt.Sprintf("cmd_get %d\r\n", atomic.LoadUint64(&db.cmdGet))
-	cmdSet := fmt.Sprintf("cmd_set %d\r\n", atomic.LoadUint64(&db.cmdSet))
+	sys := fmt.Sprintf("STAT bytes %d\r\n", ms.Sys)
+	total := fmt.Sprintf("STAT heap_sys_mb %d\r\n", ms.HeapSys/1024/1024)
+	currItems := fmt.Sprintf("STAT curr_items %d\r\n", db.Count())
+	cmdGet := fmt.Sprintf("STAT cmd_get %d\r\n", atomic.LoadUint64(&db.cmdGet))
+	cmdSet := fmt.Sprintf("STAT cmd_set %d\r\n", atomic.LoadUint64(&db.cmdSet))
 	fs := int64(0)
 	if db.ssd != nil {
 		fs, _ = db.ssd.FileSize()
 	}
 
-	cmdFs := fmt.Sprintf("file_size %d\r\n", fs)
-	buf := bytes.NewBuffer([]byte{})
+	cmdFs := fmt.Sprintf("STAT file_size %d\r\n", fs)
+	/*
+		buf := bytes.NewBuffer([]byte{})
+		w := bufio.NewWriter(buf)
+		fmt.Fprintf(w, "expvar {")
+		first := true
+		expvar.Do(func(kv expvar.KeyValue) {
+			if !first {
+				fmt.Fprintf(w, ",")
+			}
+			first = false
+			fmt.Fprintf(w, "%q: %s", kv.Key, kv.Value)
+		})
+		fmt.Fprintf(w, "}\r\n")
+		w.Flush()
+	*/
 
-	w := bufio.NewWriter(buf)
-	fmt.Fprintf(w, "expvar {")
-	first := true
-	expvar.Do(func(kv expvar.KeyValue) {
-		if !first {
-			fmt.Fprintf(w, ",")
-		}
-		first = false
-		fmt.Fprintf(w, "%q: %s", kv.Key, kv.Value)
-	})
-	fmt.Fprintf(w, "}\r\n")
-	w.Flush()
-
-	return []byte(ver + sys + total + currItems + cmdGet + cmdSet + cmdFs + string(buf.Bytes()) + "END\r\n"), nil
+	return []byte(ver + uptime + sys + total + currItems + cmdGet + cmdSet + cmdFs + "END\r\n"), nil
 }

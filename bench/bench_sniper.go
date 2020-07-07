@@ -109,7 +109,7 @@ func TestSniperSpeed() {
 
 	println("-- sniper --")
 	sniper.DeleteStore("1")
-	s, _ := sniper.Open("1")
+	s, _ := sniper.Open(sniper.Dir("1"))
 	print("set: ")
 	lotsa.Ops(N, runtime.NumCPU(), func(i, _ int) {
 		s.Set(keys[i], []byte(keysm[string(keys[i])]))

@@ -17,8 +17,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/recoilme/graceful v0.0.0-20200410170740-2103007d793f h1:8JIo/yrsvoqFhPX8RyrfkhXdF7kublzzWDrchZp/OIQ=
 github.com/recoilme/graceful v0.0.0-20200410170740-2103007d793f/go.mod h1:21JdsPKtT//WGcQxtcKzYuA9I2tXC9IsnMbglKRcG8A=
-github.com/recoilme/sniper v0.1.6 h1:WsRx+dS1ynvhR/DMrviNldlalse40fSc3WVYYwxZmgY=
-github.com/recoilme/sniper v0.1.6/go.mod h1:uPCJcDg5kCW4J9S9jr4aJCmO2D3RaKLMQotGkoedO5o=
+github.com/recoilme/sniper v0.1.8 h1:sCqPWadss7O41pRHSccVtLV9wcYwVGbowSQ9PFOq3hU=
+github.com/recoilme/sniper v0.1.8/go.mod h1:uPCJcDg5kCW4J9S9jr4aJCmO2D3RaKLMQotGkoedO5o=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0bLI=

@@ -102,7 +102,7 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	if dbdir == "" {
 		db.ssd = nil
 	} else {
-		ssd, err := sniper.Open(dbdir)
+		ssd, err := sniper.Open(sniper.Dir(dbdir))
 		if err != nil {
 			return nil, err
 		}

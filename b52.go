@@ -210,7 +210,7 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 			db.accum.Lock()
 			fmt.Fprintf(&db.accum.buf, "set %s 42 0 %d noreply\r\n%s\r\n", key, len(value), value)
 			db.accum.accumulated++
-			if db.accum.accumulated == 20 {
+			if db.accum.accumulated == 200 {
 				slaves := strings.Split(db.slaveAddr, ",")
 				bin := db.accum.buf.Bytes()
 				db.accum.buf.Reset()

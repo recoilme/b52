@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	version   = "0.1.8"
+	version   = "0.1.9"
 	port      = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
 	slaveadr  = flag.String("slave", "", "Slave address, optional, example slave=127.0.0.1:11212")
 	unixs     = flag.String("unixs", "", "unix socket")

@@ -12,7 +12,7 @@ var (
 	cmdReplace   = []byte("replace")
 	cmdSet       = []byte("set")
 	cmdGet       = []byte("get")
-	cmdGets      = []byte("gets")
+	cmdGets      = []byte("get_multi")
 	cmdClose     = []byte("close")
 	cmdCloseB    = []byte("CLOSE")
 	cmdDelete    = []byte("delete")
@@ -23,6 +23,7 @@ var (
 	cmdQuitB     = []byte("QUIT")
 	cmdVersion   = []byte("version")
 	cmdVerbosity = []byte("verbosity")
+	cmdBackup    = []byte("backup")
 
 	crlf     = []byte("\r\n")
 	space    = []byte(" ")
@@ -184,6 +185,19 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			}
 			// err mean not deleted
 			return b[i+1:], resultNotFound, nil
+
+			//}
+		case bytes.HasPrefix(line, cmdBackup):
+			key, _, err := scanDeleteLine(line)
+			if err != nil {
+				return b, nil, err
+			}
+			err = db.Backup(key)
+			if err == nil {
+				return b[i+1:], resultStored, nil
+			}
+			// err mean not deleted
+			return b[i+1:], nil, err
 
 			//}
 		case bytes.HasPrefix(line, cmdIncr):

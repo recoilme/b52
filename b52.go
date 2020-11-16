@@ -51,7 +51,7 @@ type b52 struct {
 type McEngine interface {
 	Get(key []byte) (value []byte, err error)
 	Gets(keys [][]byte) (response []byte, err error)
-	Set(key, value []byte, flags uint32, exp int32, size int, noreply bool) (err error)
+	Set(key, value []byte, flags uint32, exp uint32, size int, noreply bool) (err error)
 	Incr(key []byte, value uint64) (result uint64, err error)
 	Decr(key []byte, value uint64) (result uint64, err error)
 	Delete(key []byte) (isFound bool, err error)
@@ -175,7 +175,7 @@ func (db *b52) Gets(keys [][]byte) (resp []byte, err error) {
 
 // Set store k/v with expire time in memory cache
 // Persistent k/v - stored on disk
-func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply bool) (err error) {
+func (db *b52) Set(key, value []byte, flags uint32, exp uint32, size int, noreply bool) (err error) {
 	//println("set", string(key), string(value))
 	atomic.AddUint64(&db.cmdSet, 1)
 	if flags != 42 { //get from replication, allready encoded
@@ -188,7 +188,7 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 	}
 	// if key pesistent (no TTL)
 	if db.ssd != nil {
-		err = db.ssd.Set(key, value) // store on disk
+		err = db.ssd.Set(key, value, exp) // store on disk
 		// update on lru if any
 		if err != nil {
 			return
@@ -344,4 +344,18 @@ func (db *b52) Stats() (resp []byte, err error) {
 	*/
 
 	return []byte(ver + uptime + sys + total + currItems + cmdGet + cmdSet + cmdFs + "END\r\n"), nil
+}
+
+func (db *b52) Backup(name string) error {
+	if db.ssd != nil {
+		return db.ssd.Backup(name)
+	}
+	return nil
+}
+
+func (db *b52) Restore(name string) error {
+	if db.ssd != nil {
+		return db.ssd.Restore(name)
+	}
+	return nil
 }

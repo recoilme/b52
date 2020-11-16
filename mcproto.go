@@ -224,7 +224,7 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 //  hold data for this key".
 //  "replace" means "store this data, but only if the server *does*
 //  already hold data for this key".
-func scanSetLine(line []byte, cmd string) (key string, flags uint32, exp int32, size int, noreply bool, err error) {
+func scanSetLine(line []byte, cmd string) (key string, flags uint32, exp uint32, size int, noreply bool, err error) {
 	//set := ""
 	noreplys := ""
 	noreply = false

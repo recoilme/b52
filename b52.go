@@ -58,6 +58,8 @@ type McEngine interface {
 	Close() error
 	Count() uint64
 	Stats() (response []byte, err error)
+	Backup(name string) error
+	Restore(name string) error
 }
 
 // Newb52 - init database with params
@@ -188,6 +190,9 @@ func (db *b52) Set(key, value []byte, flags uint32, exp uint32, size int, norepl
 	}
 	// if key pesistent (no TTL)
 	if db.ssd != nil {
+		if exp != 0 {
+			exp += uint32(time.Now().Unix())
+		}
 		err = db.ssd.Set(key, value, exp) // store on disk
 		// update on lru if any
 		if err != nil {

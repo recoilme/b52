@@ -188,7 +188,7 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 
 			//}
 		case bytes.HasPrefix(line, cmdBackup):
-			key, _, err := scanDeleteLine(line)
+			key, _, err := scanBackupLine(line)
 			if err != nil {
 				return b, nil, err
 			}
@@ -293,6 +293,29 @@ func scanIncrDecrLine(line []byte, incr bool, isCap bool) (key string, val uint6
 		dest = dest[:2]
 	}
 
+	n, err := fmt.Sscanf(string(line), pattern, dest...)
+	if noreplys == "noreply" || noreplys == "NOREPLY" {
+		noreply = true
+	}
+	if n != len(dest) {
+		err = errors.New(string(resultError))
+	}
+	return
+}
+
+// scanBackupLine populates it and returns the declared params of the item.
+// It does not read the bytes of the item.
+func scanBackupLine(line []byte) (key string, noreply bool, err error) {
+	noreplys := ""
+	noreply = false
+	cmd := "backup"
+
+	pattern := cmd + " %s %s\r\n"
+	dest := []interface{}{&key, &noreplys}
+	if bytes.Count(line, space) == 1 {
+		pattern = cmd + " %s\r\n"
+		dest = dest[:1]
+	}
 	n, err := fmt.Sscanf(string(line), pattern, dest...)
 	if noreplys == "noreply" || noreplys == "NOREPLY" {
 		noreply = true

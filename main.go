@@ -65,7 +65,9 @@ func main() {
 
 	if *restore != "" {
 		err = b52.Restore(*restore)
-		log.Fatalf("failed restore database: %s", err.Error())
+		if err != nil {
+			log.Fatalf("failed restore database: %s", err.Error())
+		}
 	}
 
 	var events evio.Events

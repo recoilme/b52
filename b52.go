@@ -31,7 +31,6 @@ type accumulator struct {
 type b52 struct {
 	ssd *sniper.Store
 	lru *freecache.Cache
-	ttl *freecache.Cache
 	//slave     net.Conn
 	slaveAddr string
 	cmdGet    uint64 // Cumulative number of retrieval reqs
@@ -81,18 +80,6 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	}
 	lrusize = lrusize * 1024 * 1024 //Mb
 
-	sizettl := "100"
-	if len(p["sizettl"]) > 0 {
-		sizettl = p["sizettl"][0]
-	}
-	ttlsize, err := strconv.Atoi(sizettl)
-	if err != nil {
-		fmt.Println("sizettl parse error, fallback to default, 100Mb", err.Error())
-	} else {
-		println("sizettl:", ttlsize, "Mb")
-	}
-	ttlsize = ttlsize * 1024 * 1024
-
 	dbdir := "db"
 	if len(p["dbdir"]) > 0 {
 		dbdir = p["dbdir"][0]
@@ -113,7 +100,6 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 
 	db.lru = freecache.NewCache(lrusize)
 
-	db.ttl = freecache.NewCache(ttlsize)
 	debug.SetGCPercent(20)
 
 	atomic.StoreUint64(&db.cmdGet, 0)
@@ -124,14 +110,11 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	return db, nil
 }
 
-// Get return value from lru or ttl cache or from disk storage
+// Get return value from lru cache or from disk storage
 func (db *b52) Get(key []byte) (value []byte, err error) {
 	atomic.AddUint64(&db.cmdGet, 1)
 	if val, err := db.lru.Get(key); err == nil {
 		return snappy.Decode(nil, val)
-	}
-	if value, err := db.ttl.Get(key); err == nil {
-		return snappy.Decode(nil, value)
 	}
 	err = nil // clear key not found err
 	if db.ssd != nil {
@@ -152,12 +135,6 @@ func (db *b52) Gets(keys [][]byte) (resp []byte, err error) {
 		if val, err := db.lru.Get(key); err == nil {
 			if val, errsn := snappy.Decode(nil, val); errsn == nil {
 				fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(val), val)
-			}
-			continue
-		}
-		if value, errttl := db.ttl.Get(key); errttl == nil {
-			if value, errsn := snappy.Decode(nil, value); errsn == nil {
-				fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(value), value)
 			}
 			continue
 		}
@@ -184,10 +161,6 @@ func (db *b52) Set(key, value []byte, flags uint32, exp uint32, size int, norepl
 		value = snappy.Encode(nil, value)
 	}
 
-	if exp > 0 {
-		err = db.ttl.Set(key, value, int(exp))
-		return
-	}
 	// if key pesistent (no TTL)
 	if db.ssd != nil {
 		if exp != 0 {
@@ -274,8 +247,7 @@ func (db *b52) Decr(key []byte, value uint64) (result uint64, err error) {
 }
 
 func (db *b52) Delete(key []byte) (isFound bool, err error) {
-	isFound = db.ttl.Del(key)
-	db.lru.Del(key)
+	isFound = db.lru.Del(key)
 	if db.ssd != nil {
 		isFound, err = db.ssd.Delete(key)
 

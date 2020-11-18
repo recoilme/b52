@@ -11,6 +11,7 @@ var (
 	cmdAdd       = []byte("add")
 	cmdReplace   = []byte("replace")
 	cmdSet       = []byte("set")
+	cmdTouch     = []byte("touch")
 	cmdGet       = []byte("get")
 	cmdGets      = []byte("gets")
 	cmdClose     = []byte("close")
@@ -93,6 +94,7 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 				return b[mustlen:], resultNotStored, err
 			}
 			return b[mustlen:], resultStored, err
+
 		case bytes.HasPrefix(line, cmdReplace):
 			//  "replace" means "store this data, but only if the server *does*
 			key, flags, exp, size, noreply, err := scanSetLine(line, string(cmdReplace))
@@ -116,8 +118,8 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 				return b[mustlen:], resultNotStored, err
 			}
 			return b[mustlen:], resultStored, err
-		case bytes.HasPrefix(line, cmdSet):
 
+		case bytes.HasPrefix(line, cmdSet):
 			key, flags, exp, size, noreply, err := scanSetLine(line, string(cmdSet))
 			if err != nil {
 				return b, nil, err
@@ -140,7 +142,26 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 				return b[mustlen:], resultNotStored, err
 			}
 			return b[mustlen:], resultStored, err
-		case bytes.HasPrefix(line, cmdGet), bytes.HasPrefix(line, cmdGets):
+
+		case bytes.HasPrefix(line, cmdTouch):
+			key, exp, noreply, err := scanTouchLine(line, string(cmdTouch))
+			if err != nil {
+				return b, nil, err
+			}
+			err = db.Touch([]byte(key), exp)
+			if noreply {
+				//fmt.Println("noreply set")
+				return b[i+1:], nil, err
+			}
+			if err != nil {
+				if !strings.Contains(err.Error(), "not found") {
+					return b[i+1:], resultNotStored, err
+				}
+				return b[i+1:], resultNotFound, nil
+			}
+			return b[i+1:], resultTouched, nil
+
+		case bytes.HasPrefix(line, cmdGet):
 			//fmt.Println("get")
 			cntspace := bytes.Count(line, space)
 			if cntspace == 0 {
@@ -185,21 +206,20 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 			}
 			// err mean not deleted
 			return b[i+1:], resultNotFound, nil
-
 			//}
+
 		case bytes.HasPrefix(line, cmdBackup):
-			key, _, err := scanBackupLine(line)
+			filename, _, err := scanBackupLine(line)
 			if err != nil {
 				return b, nil, err
 			}
-			err = db.Backup(key)
+			err = db.Backup(filename)
 			if err == nil {
 				return b[i+1:], resultStored, nil
 			}
 			// err mean not deleted
 			return b[i+1:], nil, err
 
-			//}
 		case bytes.HasPrefix(line, cmdIncr):
 			return b[i+1:], resultError, nil
 		case bytes.HasPrefix(line, cmdVersion):
@@ -241,6 +261,30 @@ func scanSetLine(line []byte, cmd string) (key string, flags uint32, exp uint32,
 	}
 	if n != len(dest) {
 		err = errors.New("wrong set params" + string(line))
+	}
+	return
+}
+
+// scanTouchLine populates it and returns the declared params of the item.
+// It does not read the bytes of the item.
+// touch <key> <exptime> [noreply]\r\n
+func scanTouchLine(line []byte, cmd string) (key string, exp uint32, noreply bool, err error) {
+	//set := ""
+	noreplys := ""
+	noreply = false
+	pattern := cmd + " %s %d %s\r\n"
+	dest := []interface{}{&key, &exp, &noreplys}
+
+	if bytes.Count(line, space) == 2 {
+		pattern = cmd + " %s %d\r\n"
+		dest = dest[:2]
+	}
+	n, err := fmt.Sscanf(string(line), pattern, dest...)
+	if noreplys == "noreply" || noreplys == "NOREPLY" {
+		noreply = true
+	}
+	if n != len(dest) {
+		err = errors.New("wrong touch params" + string(line))
 	}
 	return
 }
@@ -303,15 +347,14 @@ func scanIncrDecrLine(line []byte, incr bool, isCap bool) (key string, val uint6
 	return
 }
 
-// scanBackupLine populates it and returns the declared params of the item.
-// It does not read the bytes of the item.
-func scanBackupLine(line []byte) (key string, noreply bool, err error) {
+// scanBackupLine populates it and returns the backup filename
+func scanBackupLine(line []byte) (filename string, noreply bool, err error) {
 	noreplys := ""
 	noreply = false
 	cmd := "backup"
 
 	pattern := cmd + " %s %s\r\n"
-	dest := []interface{}{&key, &noreplys}
+	dest := []interface{}{&filename, &noreplys}
 	if bytes.Count(line, space) == 1 {
 		pattern = cmd + " %s\r\n"
 		dest = dest[:1]

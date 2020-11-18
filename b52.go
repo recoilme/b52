@@ -48,6 +48,7 @@ type McEngine interface {
 	Get(key []byte) (value []byte, err error)
 	Gets(keys [][]byte) (response []byte, err error)
 	Set(key, value []byte, flags uint32, exp uint32, size int, noreply bool) (err error)
+	Touch(key []byte, exp uint32) (err error)
 	Incr(key []byte, value uint64) (result uint64, err error)
 	Decr(key []byte, value uint64) (result uint64, err error)
 	Delete(key []byte) (isFound bool, err error)
@@ -76,7 +77,7 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	if dbdir == "" {
 		db.ssd = nil
 	} else {
-		ssd, err := sniper.Open(sniper.Dir(dbdir))
+		ssd, err := sniper.Open(sniper.Dir(dbdir), sniper.ExpireInterval(time.Minute*5))
 		if err != nil {
 			return nil, err
 		}
@@ -193,6 +194,16 @@ func (db *b52) Set(key, value []byte, flags uint32, exp uint32, size int, norepl
 			//}
 		}
 		return
+	}
+	return
+}
+
+func (db *b52) Touch(key []byte, exp uint32) (err error) {
+	if db.ssd != nil {
+		if exp != 0 {
+			exp += uint32(time.Now().Unix())
+		}
+		err = db.ssd.Touch(key, exp)
 	}
 	return
 }

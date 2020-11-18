@@ -24,7 +24,7 @@ var (
 	loops     = flag.Int("loops", -1, "num loops")
 	balance   = flag.String("balance", "random", "balance - random, round-robin or least-connections")
 	keepalive = flag.Int("keepalive", 10, "keepalive connection, in seconds")
-	params    = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: sizelru=100&sizettl=100&dbdir=db")
+	params    = flag.String("params", "", "params for b52 engines, url query format, all size in Mb, default: dbdir=db")
 	restore   = flag.String("restore", "", "backup file name for load")
 	startTime = int64(0)
 )

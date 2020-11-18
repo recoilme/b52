@@ -12,7 +12,7 @@ var (
 	cmdReplace   = []byte("replace")
 	cmdSet       = []byte("set")
 	cmdGet       = []byte("get")
-	cmdGets      = []byte("get_multi")
+	cmdGets      = []byte("gets")
 	cmdClose     = []byte("close")
 	cmdCloseB    = []byte("CLOSE")
 	cmdDelete    = []byte("delete")

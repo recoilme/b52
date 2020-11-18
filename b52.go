@@ -11,13 +11,11 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/coocood/freecache"
 	"github.com/golang/snappy"
 	"github.com/recoilme/sniper"
 )
@@ -30,7 +28,6 @@ type accumulator struct {
 
 type b52 struct {
 	ssd *sniper.Store
-	lru *freecache.Cache
 	//slave     net.Conn
 	slaveAddr string
 	cmdGet    uint64 // Cumulative number of retrieval reqs
@@ -67,18 +64,6 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	//params
-	sizelru := "100"
-	if len(p["sizelru"]) > 0 {
-		sizelru = p["sizelru"][0]
-	}
-	lrusize, err := strconv.Atoi(sizelru)
-	if err != nil {
-		println("sizelru parse error, fallback to default, 100Mb", err.Error())
-	} else {
-		println("sizelru:", lrusize, "Mb")
-	}
-	lrusize = lrusize * 1024 * 1024 //Mb
 
 	dbdir := "db"
 	if len(p["dbdir"]) > 0 {
@@ -98,8 +83,6 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 		db.ssd = ssd
 	}
 
-	db.lru = freecache.NewCache(lrusize)
-
 	debug.SetGCPercent(20)
 
 	atomic.StoreUint64(&db.cmdGet, 0)
@@ -110,13 +93,9 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	return db, nil
 }
 
-// Get return value from lru cache or from disk storage
+// Get value from disk storage
 func (db *b52) Get(key []byte) (value []byte, err error) {
 	atomic.AddUint64(&db.cmdGet, 1)
-	if val, err := db.lru.Get(key); err == nil {
-		return snappy.Decode(nil, val)
-	}
-	err = nil // clear key not found err
 	if db.ssd != nil {
 		value, err = db.ssd.Get(key)
 		if err == nil {
@@ -132,12 +111,6 @@ func (db *b52) Gets(keys [][]byte) (resp []byte, err error) {
 	w := bufio.NewWriter(buf)
 	for _, key := range keys {
 		atomic.AddUint64(&db.cmdGet, 1)
-		if val, err := db.lru.Get(key); err == nil {
-			if val, errsn := snappy.Decode(nil, val); errsn == nil {
-				fmt.Fprintf(w, "VALUE %s 0 %d\r\n%s\r\n", key, len(val), val)
-			}
-			continue
-		}
 		if db.ssd != nil {
 			if value, errssd := db.ssd.Get(key); errssd == nil {
 				if value, errsn := snappy.Decode(nil, value); errsn == nil {
@@ -167,12 +140,6 @@ func (db *b52) Set(key, value []byte, flags uint32, exp uint32, size int, norepl
 			exp += uint32(time.Now().Unix())
 		}
 		err = db.ssd.Set(key, value, exp) // store on disk
-		// update on lru if any
-		if err != nil {
-			return
-		}
-		db.lru.Set(key, value, 10)
-
 		/*if db.slaveAddr != "" && db.slave == nil {
 			//dial to slave
 			c, errSlave := net.Dial("udp", db.slaveAddr)
@@ -227,8 +194,6 @@ func (db *b52) Set(key, value []byte, flags uint32, exp uint32, size int, norepl
 		}
 		return
 	}
-	//no disk store
-	db.lru.Set(key, value, 0)
 	return
 }
 
@@ -247,7 +212,6 @@ func (db *b52) Decr(key []byte, value uint64) (result uint64, err error) {
 }
 
 func (db *b52) Delete(key []byte) (isFound bool, err error) {
-	isFound = db.lru.Del(key)
 	if db.ssd != nil {
 		isFound, err = db.ssd.Delete(key)
 

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"sync/atomic"
 	"time"
@@ -15,8 +16,10 @@ import (
 )
 
 var (
-	version   = "0.1.9"
-	port      = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
+	version  = "0.2.0"
+	port     = flag.Int("p", 11211, "TCP port number to listen on (default: 11211)")
+	httpport = flag.String("httpport", ":8080", "Http port number to listen on (default: 8080)")
+
 	slaveadr  = flag.String("slave", "", "Slave address, optional, example slave=127.0.0.1:11212")
 	unixs     = flag.String("unixs", "", "unix socket")
 	stdlib    = flag.Bool("stdlib", false, "use stdlib")
@@ -61,7 +64,13 @@ func main() {
 		return nil
 	}
 	graceful.Unignore(quit, fallback, graceful.Terminate...)
-
+	server := &Server{Db: b52}
+	serve := func() {
+		if err := http.ListenAndServe(*httpport, server); err != nil {
+			log.Fatalf("could not listen on port 80 %v", err)
+		}
+	}
+	go serve()
 	var events evio.Events
 	switch *balance {
 	default:
@@ -102,7 +111,7 @@ func main() {
 			fmt.Printf("wake from %s\n", ec.RemoteAddr())
 			return nil, evio.Close
 		}
-		//println(string(in))
+		//logg("bytes recievied:", string(in))
 		var data []byte
 		var c *conn
 		if ec.Context() == nil {
@@ -155,4 +164,5 @@ func main() {
 		fmt.Println(err.Error())
 		log.Fatal(err)
 	}
+
 }

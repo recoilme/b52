@@ -11,6 +11,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/golang/snappy v0.0.1 h1:Qgr9rKW7uDUkrbSmQeiDsGa8SjGyCOGtuasMWwvp2P4=
 github.com/golang/snappy v0.0.1/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
+github.com/golang/snappy v0.0.2 h1:aeE13tS0IiQgFjYdoL8qN3K1N2bXXtI6Vi51/y7BpMw=
+github.com/golang/snappy v0.0.2/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
 github.com/kavu/go_reuseport v1.5.0 h1:UNuiY2OblcqAtVDE8Gsg1kZz8zbBWg907sP1ceBV+bk=
 github.com/kavu/go_reuseport v1.5.0/go.mod h1:CG8Ee7ceMFSMnx/xr25Vm0qXaj2Z4i5PWoUx+JZ5/CU=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
@@ -19,6 +21,8 @@ github.com/recoilme/graceful v0.0.0-20200410170740-2103007d793f h1:8JIo/yrsvoqFh
 github.com/recoilme/graceful v0.0.0-20200410170740-2103007d793f/go.mod h1:21JdsPKtT//WGcQxtcKzYuA9I2tXC9IsnMbglKRcG8A=
 github.com/recoilme/sniper v0.1.8 h1:sCqPWadss7O41pRHSccVtLV9wcYwVGbowSQ9PFOq3hU=
 github.com/recoilme/sniper v0.1.8/go.mod h1:uPCJcDg5kCW4J9S9jr4aJCmO2D3RaKLMQotGkoedO5o=
+github.com/recoilme/sniper v0.2.0 h1:XBhA3Bl85FY2a3b3KvpEhLv3mSm3hb1MpsUl1bjREWY=
+github.com/recoilme/sniper v0.2.0/go.mod h1:uPCJcDg5kCW4J9S9jr4aJCmO2D3RaKLMQotGkoedO5o=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0bLI=

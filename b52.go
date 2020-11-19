@@ -37,18 +37,11 @@ type b52 struct {
 	cmdGet    uint64 // Cumulative number of retrieval reqs
 	cmdSet    uint64 // Cumulative number of storage reqs
 	accum     *accumulator
-	/*
-	   | get_hits              | 64u     | Number of keys that have been requested   |
-	   |                       |         | and found present                         |
-	   | get_misses            | 64u     | Number of items that have been requested  |
-	   |                       |         | and not found
-	   | get_expired           | 64u     | Number of items that have been requested  |
-	   |                       |         | but had already expired.                  |
-	*/
 }
 
 //McEngine  - any db implemented memcache proto
 type McEngine interface {
+	Store() *sniper.Store
 	Get(key []byte) (value []byte, err error)
 	Gets(keys [][]byte) (response []byte, err error)
 	Set(key, value []byte, flags uint32, exp int32, size int, noreply bool) (err error)
@@ -102,7 +95,7 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	if dbdir == "" {
 		db.ssd = nil
 	} else {
-		ssd, err := sniper.Open(sniper.Dir(dbdir))
+		ssd, err := sniper.Open(sniper.Dir(dbdir), sniper.SyncInterval(1*time.Second))
 		if err != nil {
 			return nil, err
 		}
@@ -124,6 +117,7 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 
 // Get return value from lru or ttl cache or from disk storage
 func (db *b52) Get(key []byte) (value []byte, err error) {
+	//logg("get request, key:", string(key))
 	atomic.AddUint64(&db.cmdGet, 1)
 	if val, err := db.lru.Get(key); err == nil {
 		return snappy.Decode(nil, val)
@@ -193,19 +187,7 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 		if err != nil {
 			return
 		}
-		db.lru.Set(key, value, 10)
-
-		/*if db.slaveAddr != "" && db.slave == nil {
-			//dial to slave
-			c, errSlave := net.Dial("udp", db.slaveAddr)
-			if errSlave != nil {
-				fmt.Println(errSlave)
-				return
-			}
-			db.slave = c
-		}
-		if db.slave != nil*/
-		//fmt.Println(db.accum.accumulated)
+		db.lru.Set(key, value, 0)
 		if db.slaveAddr != "" && flags != 42 && err == nil {
 			db.accum.Lock()
 			fmt.Fprintf(&db.accum.buf, "set %s 42 0 %d noreply\r\n%s\r\n", key, len(value), value)
@@ -214,38 +196,17 @@ func (db *b52) Set(key, value []byte, flags uint32, exp int32, size int, noreply
 				slaves := strings.Split(db.slaveAddr, ",")
 				bin := db.accum.buf.Bytes()
 				db.accum.buf.Reset()
-				//fmt.Printf("Accum:2, buf:%s len:%d\n", string(bin), len(db.accum.buf.Bytes()))
-				hostname, errHN := os.Hostname()
-				if err != nil {
-					fmt.Println("Error, get hostname: ", errHN)
-				}
-				for _, slave := range slaves {
-					if strings.Contains(slave, hostname) {
-						continue
-					}
-					c, cErr := net.Dial("tcp", slave)
-					if cErr != nil {
-						fmt.Println("Error, connection:" + slave + cErr.Error())
-						break
-					}
-					writed, copyErr := io.Copy(c, bytes.NewBuffer(bin))
-					if writed != int64(len(bin)) || copyErr != nil {
-						fmt.Printf("Error, write 2 connection:%s writed:%d len:%d err:%v\n", slave, writed, len(bin), copyErr)
-					}
-					closeErr := c.Close()
-					if closeErr != nil {
-						fmt.Println("Error,close:" + closeErr.Error())
-					}
-				}
 				db.accum.accumulated = 0
+
+				// a wait group enables the main process a wait for goroutines to finish
+				wg := sync.WaitGroup{}
+				for _, slave := range slaves {
+					wg.Add(1)
+					go replicate(&wg, slave, bin)
+				}
+				wg.Wait()
 			}
 			db.accum.Unlock()
-
-			//go fmt.Fprintf(db.slave, "set %s 42 0 %d\r\n%s\r\n", key, len(value), value)
-			//if e != nil {
-			//fmt.Println("slave err", e.Error(), n)
-			//db.slave = nil
-			//}
 		}
 		return
 	}
@@ -312,7 +273,7 @@ func (db *b52) Count() uint64 {
 
 func (db *b52) Stats() (resp []byte, err error) {
 	ver := "STAT version " + version + "\r\n"
-	uptime := fmt.Sprintf("STAT uptime %d\r\n", uint32(time.Now().Unix()-startTime))
+	uptime := fmt.Sprintf("STAT ServeHTTP %d\r\n", uint32(time.Now().Unix()-startTime))
 	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
@@ -344,4 +305,42 @@ func (db *b52) Stats() (resp []byte, err error) {
 	*/
 
 	return []byte(ver + uptime + sys + total + currItems + cmdGet + cmdSet + cmdFs + "END\r\n"), nil
+}
+
+func logg(a ...interface{}) (n int, err error) {
+	buf := bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("%s ", time.Now().Format("15:04:05")))
+	for _, s := range a {
+		buf.WriteString(fmt.Sprint(s, " "))
+	}
+	return fmt.Fprintln(os.Stdout, buf.String())
+}
+
+func (db *b52) Store() *sniper.Store {
+	return db.ssd
+}
+
+func replicate(wg *sync.WaitGroup, slave string, bin []byte) {
+	var err error
+	defer wg.Done()
+	hostname, errHN := os.Hostname()
+	if err != nil {
+		fmt.Println("Error, get hostname: ", errHN)
+	}
+	if strings.Contains(slave, hostname) {
+		return
+	}
+	c, cErr := net.Dial("tcp", slave)
+	if cErr != nil {
+		fmt.Println("Error, connection:" + slave + cErr.Error())
+		return
+	}
+	writed, copyErr := io.Copy(c, bytes.NewBuffer(bin))
+	if writed != int64(len(bin)) || copyErr != nil {
+		fmt.Printf("Error, write 2 connection:%s writed:%d len:%d err:%v\n", slave, writed, len(bin), copyErr)
+	}
+	closeErr := c.Close()
+	if closeErr != nil {
+		fmt.Println("Error,close:" + closeErr.Error())
+	}
 }

@@ -156,6 +156,7 @@ func mcproto(b []byte, db McEngine) ([]byte, []byte, error) {
 				}
 				buf.Write(resultEnd)
 				return b[i+1:], buf.Bytes(), nil
+				//return b[len(b):], buf.Bytes(), nil
 			}
 			//multiline get/gets
 			args := bytes.Split(line[:len(line)-2], space)

@@ -29,10 +29,11 @@ type accumulator struct {
 type b52 struct {
 	ssd *sniper.Store
 	//slave     net.Conn
-	slaveAddr string
-	cmdGet    uint64 // Cumulative number of retrieval reqs
-	cmdSet    uint64 // Cumulative number of storage reqs
-	accum     *accumulator
+	slaveAddr  string
+	cmdGet     uint64 // Cumulative number of retrieval reqs
+	cmdSet     uint64 // Cumulative number of storage reqs
+	lastUpdate int64  // last update timestamp
+	accum      *accumulator
 	/*
 	   | get_hits              | 64u     | Number of keys that have been requested   |
 	   |                       |         | and found present                         |
@@ -137,10 +138,12 @@ func (db *b52) Set(key, value []byte, flags uint32, exp uint32, size int, norepl
 
 	// if key pesistent (no TTL)
 	if db.ssd != nil {
+		atomic.StoreInt64(&db.lastUpdate, time.Now().Unix())
+		expire := exp
 		if exp != 0 {
-			exp += uint32(time.Now().Unix())
+			expire += uint32(time.Now().Unix())
 		}
-		err = db.ssd.Set(key, value, exp) // store on disk
+		err = db.ssd.Set(key, value, expire) // store on disk
 		/*if db.slaveAddr != "" && db.slave == nil {
 			//dial to slave
 			c, errSlave := net.Dial("udp", db.slaveAddr)
@@ -154,7 +157,7 @@ func (db *b52) Set(key, value []byte, flags uint32, exp uint32, size int, norepl
 		//fmt.Println(db.accum.accumulated)
 		if db.slaveAddr != "" && flags != 42 && err == nil {
 			db.accum.Lock()
-			fmt.Fprintf(&db.accum.buf, "set %s 42 0 %d noreply\r\n%s\r\n", key, len(value), value)
+			fmt.Fprintf(&db.accum.buf, "set %s 42 %d %d noreply\r\n%s\r\n", key, exp, len(value), value)
 			db.accum.accumulated++
 			if db.accum.accumulated == 200 {
 				slaves := strings.Split(db.slaveAddr, ",")
@@ -200,6 +203,7 @@ func (db *b52) Set(key, value []byte, flags uint32, exp uint32, size int, norepl
 
 func (db *b52) Touch(key []byte, exp uint32) (err error) {
 	if db.ssd != nil {
+		atomic.StoreInt64(&db.lastUpdate, time.Now().Unix())
 		if exp != 0 {
 			exp += uint32(time.Now().Unix())
 		}
@@ -210,6 +214,7 @@ func (db *b52) Touch(key []byte, exp uint32) (err error) {
 
 func (db *b52) Incr(key []byte, value uint64) (result uint64, err error) {
 	if db.ssd != nil {
+		atomic.StoreInt64(&db.lastUpdate, time.Now().Unix())
 		result, err = db.ssd.Incr(key, value)
 	}
 	return
@@ -217,6 +222,7 @@ func (db *b52) Incr(key []byte, value uint64) (result uint64, err error) {
 
 func (db *b52) Decr(key []byte, value uint64) (result uint64, err error) {
 	if db.ssd != nil {
+		atomic.StoreInt64(&db.lastUpdate, time.Now().Unix())
 		result, err = db.ssd.Decr(key, value)
 	}
 	return
@@ -224,6 +230,7 @@ func (db *b52) Decr(key []byte, value uint64) (result uint64, err error) {
 
 func (db *b52) Delete(key []byte) (isFound bool, err error) {
 	if db.ssd != nil {
+		atomic.StoreInt64(&db.lastUpdate, time.Now().Unix())
 		isFound, err = db.ssd.Delete(key)
 
 		if db.slaveAddr != "" && isFound && err == nil {
@@ -273,6 +280,7 @@ func (db *b52) Stats() (resp []byte, err error) {
 	currItems := fmt.Sprintf("STAT curr_items %d\r\n", db.Count())
 	cmdGet := fmt.Sprintf("STAT cmd_get %d\r\n", atomic.LoadUint64(&db.cmdGet))
 	cmdSet := fmt.Sprintf("STAT cmd_set %d\r\n", atomic.LoadUint64(&db.cmdSet))
+	lastUpdate := fmt.Sprintf("STAT last_update_time %d\r\n", atomic.LoadInt64(&db.lastUpdate))
 	fs := int64(0)
 	if db.ssd != nil {
 		fs, _ = db.ssd.FileSize()
@@ -295,7 +303,7 @@ func (db *b52) Stats() (resp []byte, err error) {
 		w.Flush()
 	*/
 
-	return []byte(ver + uptime + sys + total + currItems + cmdGet + cmdSet + cmdFs + "END\r\n"), nil
+	return []byte(ver + uptime + sys + total + currItems + cmdGet + cmdSet + lastUpdate + cmdFs + "END\r\n"), nil
 }
 
 func (db *b52) Backup(name string) error {

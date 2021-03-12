@@ -13,7 +13,9 @@ github.com/recoilme/graceful v0.0.0-20200410170740-2103007d793f h1:8JIo/yrsvoqFh
 github.com/recoilme/graceful v0.0.0-20200410170740-2103007d793f/go.mod h1:21JdsPKtT//WGcQxtcKzYuA9I2tXC9IsnMbglKRcG8A=
 github.com/recoilme/sniper v0.2.0 h1:XBhA3Bl85FY2a3b3KvpEhLv3mSm3hb1MpsUl1bjREWY=
 github.com/recoilme/sniper v0.2.0/go.mod h1:uPCJcDg5kCW4J9S9jr4aJCmO2D3RaKLMQotGkoedO5o=
+github.com/recoilme/sniper v0.3.0 h1:uf+xX1MtJMJsevUvNMkIWXHeDuJuyvXTd1KwbuB269I=
 github.com/recoilme/sniper v0.3.0/go.mod h1:Mnt1ADFceOfZAaeZPgwEsnJy1nhhHX2paVZMt7Bu0rk=
+github.com/recoilme/sortedset v0.0.0-20200825100557-fdc6fff0bc87 h1:WKeK1vEaQllmIkb9ik8aZ7VP5k/xDf0O/bnnt9uwuYc=
 github.com/recoilme/sortedset v0.0.0-20200825100557-fdc6fff0bc87/go.mod h1:YB55h6bCtRPPhCT4AWwAwKtKBk7xP4b9cZgUMnsgpMo=
 github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0bLI=
 github.com/spaolacci/murmur3 v1.1.0/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=

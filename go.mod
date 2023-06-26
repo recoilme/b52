@@ -7,7 +7,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/snappy v0.0.2
 	github.com/recoilme/graceful v0.0.0-20200410170740-2103007d793f
-	github.com/recoilme/sniper v0.3.0
+	github.com/recoilme/sniper v0.4.0
 	github.com/tidwall/evio v1.0.8
 	github.com/tidwall/lotsa v1.0.1
 )

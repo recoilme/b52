@@ -1,3 +1,4 @@
+bou.ke/monkey v1.0.2/go.mod h1:OqickVX3tNx6t33n1xvtTtu85YN5s6cKwVug+oHMaIA=
 github.com/bradfitz/gomemcache v0.0.0-20190913173617-a41fca850d0b h1:L/QXpzIa3pOvUGt1D1lA5KjYhPBAN/3iWdP7xeFS9F0=
 github.com/bradfitz/gomemcache v0.0.0-20190913173617-a41fca850d0b/go.mod h1:H0wQNHz2YrLsuXOZozoeDmnHXkNCRmMW0gwFWDfEZDA=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -11,10 +12,12 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/recoilme/graceful v0.0.0-20200410170740-2103007d793f h1:8JIo/yrsvoqFhPX8RyrfkhXdF7kublzzWDrchZp/OIQ=
 github.com/recoilme/graceful v0.0.0-20200410170740-2103007d793f/go.mod h1:21JdsPKtT//WGcQxtcKzYuA9I2tXC9IsnMbglKRcG8A=
-github.com/recoilme/sniper v0.2.0 h1:XBhA3Bl85FY2a3b3KvpEhLv3mSm3hb1MpsUl1bjREWY=
-github.com/recoilme/sniper v0.2.0/go.mod h1:uPCJcDg5kCW4J9S9jr4aJCmO2D3RaKLMQotGkoedO5o=
 github.com/recoilme/sniper v0.3.0 h1:uf+xX1MtJMJsevUvNMkIWXHeDuJuyvXTd1KwbuB269I=
 github.com/recoilme/sniper v0.3.0/go.mod h1:Mnt1ADFceOfZAaeZPgwEsnJy1nhhHX2paVZMt7Bu0rk=
+github.com/recoilme/sniper v0.3.1-0.20230622104328-ae268e2dc496 h1:i5YAavUtBD3YxvaNpiYgpj7qVQ5TynS1g5kJNTUq3Tk=
+github.com/recoilme/sniper v0.3.1-0.20230622104328-ae268e2dc496/go.mod h1:QNycEXIJLvZGsHadoaPGuku8P43585JmJUImXZ5B9y0=
+github.com/recoilme/sniper v0.4.0 h1:Iv+4M0wEvtaO2BwFd88n8Ay2lDZ5yhV78wM/S2QGw1Y=
+github.com/recoilme/sniper v0.4.0/go.mod h1:QNycEXIJLvZGsHadoaPGuku8P43585JmJUImXZ5B9y0=
 github.com/recoilme/sortedset v0.0.0-20200825100557-fdc6fff0bc87 h1:WKeK1vEaQllmIkb9ik8aZ7VP5k/xDf0O/bnnt9uwuYc=
 github.com/recoilme/sortedset v0.0.0-20200825100557-fdc6fff0bc87/go.mod h1:YB55h6bCtRPPhCT4AWwAwKtKBk7xP4b9cZgUMnsgpMo=
 github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0bLI=

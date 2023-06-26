@@ -20,6 +20,8 @@ import (
 	"github.com/recoilme/sniper"
 )
 
+const fileMode = 0644
+
 type accumulator struct {
 	sync.RWMutex
 	buf         bytes.Buffer
@@ -44,7 +46,7 @@ type b52 struct {
 	*/
 }
 
-//McEngine  - any db implemented memcache proto
+// McEngine  - any db implemented memcache proto
 type McEngine interface {
 	Get(key []byte) (value []byte, err error)
 	Gets(keys [][]byte) (response []byte, err error)
@@ -78,7 +80,7 @@ func Newb52(params, slaveadr string) (McEngine, error) {
 	if dbdir == "" {
 		db.ssd = nil
 	} else {
-		ssd, err := sniper.Open(sniper.Dir(dbdir), sniper.ExpireInterval(time.Minute*5))
+		ssd, err := sniper.Open(sniper.Dir(dbdir), sniper.ExpireInterval(time.Minute))
 		if err != nil {
 			return nil, err
 		}
@@ -308,14 +310,24 @@ func (db *b52) Stats() (resp []byte, err error) {
 
 func (db *b52) Backup(name string) error {
 	if db.ssd != nil {
-		return db.ssd.Backup(name)
+		file, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_EXCL, os.FileMode(fileMode))
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		return db.ssd.Backup(file)
 	}
 	return nil
 }
 
 func (db *b52) Restore(name string) error {
 	if db.ssd != nil {
-		return db.ssd.Restore(name)
+		file, err := os.OpenFile(name, os.O_RDONLY, os.FileMode(fileMode))
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		return db.ssd.Restore(file)
 	}
 	return nil
 }

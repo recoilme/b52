@@ -273,6 +273,7 @@ func (db *b52) Count() uint64 {
 
 func (db *b52) Stats() (resp []byte, err error) {
 	ver := "STAT version " + version + "\r\n"
+	sniperver := "STAT sniper_version " + sniper.Version + "\r\n"
 	uptime := fmt.Sprintf("STAT uptime %d\r\n", uint32(time.Now().Unix()-startTime))
 	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
 	var ms runtime.MemStats
@@ -305,7 +306,7 @@ func (db *b52) Stats() (resp []byte, err error) {
 		w.Flush()
 	*/
 
-	return []byte(ver + uptime + sys + total + currItems + cmdGet + cmdSet + lastUpdate + cmdFs + "END\r\n"), nil
+	return []byte(ver + sniperver + uptime + sys + total + currItems + cmdGet + cmdSet + lastUpdate + cmdFs + "END\r\n"), nil
 }
 
 func (db *b52) Backup(name string) error {
